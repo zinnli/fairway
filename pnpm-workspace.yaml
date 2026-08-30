@@ -1,0 +1,3 @@
+# msw는 설치 후 스크립트를 돌린다 (브라우저 워커 파일 준비). 허용.
+allowBuilds:
+  msw: true
