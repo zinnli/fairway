@@ -3,7 +3,6 @@ import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
-import { OnboardingPage } from '@/pages/OnboardingPage';
 import { CasesPage } from '@/pages/CasesPage';
 import { CaseWorkspacePage } from '@/pages/CaseWorkspacePage';
 
@@ -27,7 +26,6 @@ export function App() {
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/onboarding" element={<OnboardingPage />} />
         <Route path="/cases" element={<CasesPage />} />
         <Route path="/cases/:caseId" element={<CaseWorkspacePage />} />
         {import.meta.env.DEV && (

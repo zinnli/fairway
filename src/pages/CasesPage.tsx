@@ -1,8 +1,8 @@
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Sidebar } from '@/features/cases/Sidebar';
+import { OnboardingModal } from '@/features/onboarding/OnboardingModal';
 import { useCaseStore } from '@/store/caseStore';
 
 /**
@@ -12,17 +12,13 @@ import { useCaseStore } from '@/store/caseStore';
  * ★ 사건이 있을 때의 오른쪽 칸은 시안에 없다(h09부터는 작업 화면이 차지한다).
  *   문구 두 줄만 새로 썼고, 디자인 담당 확인이 필요하다.
  *
- * 사건이 0개면 온보딩으로 보낸다. 닫고 돌아온 사람은 다시 던지지 않고 h08 빈 상태를 보여 준다 —
- * 안 그러면 온보딩과 목록 사이를 오가며 갇힌다.
+ * 사건이 0개면 온보딩(h06~h07)을 이 화면 위에 얹는다. 시안이 사건 목록 위에 덮인 모달로
+ * 그렸으므로 라우트가 아니다. 닫으면 표시를 남겨 다시 열리지 않고 h08 빈 상태가 드러난다.
  */
 export function CasesPage() {
   const navigate = useNavigate();
-  const { list, loaded, create, onboardingSeen } = useCaseStore();
+  const { list, loaded, create, onboardingSeen, markOnboardingSeen } = useCaseStore();
   const empty = loaded && list.length === 0;
-
-  useEffect(() => {
-    if (empty && !onboardingSeen) navigate('/onboarding', { replace: true });
-  }, [empty, onboardingSeen, navigate]);
 
   return (
     <div className="flex h-dvh bg-bg-3">
@@ -58,6 +54,8 @@ export function CasesPage() {
           <Icon name="plus" size={16} strokeWidth={2} />새 사건 만들기
         </Button>
       </main>
+
+      <OnboardingModal open={empty && !onboardingSeen} onClose={markOnboardingSeen} />
     </div>
   );
 }
