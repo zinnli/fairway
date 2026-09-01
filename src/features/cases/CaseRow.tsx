@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
 import { StatusBadge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -12,7 +12,22 @@ import { cn } from '@/lib/cn';
  *
  * 핸드오프 메모(h09): 선택되지 않은 줄의 ⋯ 버튼은 평소 숨기고 hover·focus 때만 보인다.
  * 히트 영역 32는 항상 유지한다.
+ *
+ * 메뉴는 position:fixed다. 목록이 .panel-scroll(overflow-y:auto) 안에 있어서
+ * absolute로 두면 아래쪽 줄의 메뉴가 스크롤 상자에 잘린다.
  */
+
+/** 줄 아래 4px 띄우고 왼쪽에서 8px — 원래 쓰던 mt-1 · left-2와 같은 값 */
+const GAP = 4;
+const INSET = 8;
+
+interface Anchor {
+  top: number;
+  bottom: number;
+  left: number;
+  viewportH: number;
+}
+
 export function CaseRow({
   item,
   selected,
@@ -26,16 +41,57 @@ export function CaseRow({
   onDelete: () => void;
   onHistory: () => void;
 }) {
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [anchor, setAnchor] = useState<Anchor | null>(null);
+  const [flipped, setFlipped] = useState(false);
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(item.title ?? '');
   const inputRef = useRef<HTMLInputElement>(null);
+  const rowRef = useRef<HTMLDivElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (editing) inputRef.current?.select();
   }, [editing]);
 
+  /* 아래로 열면 화면 밖으로 나가는 줄은 위로 뒤집는다.
+     paint 전에 도는 훅이라 위치가 한 번 튀어 보이지 않는다 */
+  useLayoutEffect(() => {
+    if (!anchor || flipped) return;
+    const el = menuRef.current;
+    if (el && el.getBoundingClientRect().bottom > anchor.viewportH - INSET) setFlipped(true);
+  }, [anchor, flipped]);
+
+  /* 목록을 스크롤하거나 창을 줄이면 메뉴가 제 줄에서 떨어져 나가므로 닫는다 */
+  useEffect(() => {
+    if (!anchor) return;
+    const close = () => setAnchor(null);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') close();
+    };
+    window.addEventListener('scroll', close, true);
+    window.addEventListener('resize', close);
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('scroll', close, true);
+      window.removeEventListener('resize', close);
+      window.removeEventListener('keydown', onKey);
+    };
+  }, [anchor]);
+
   const title = item.title ?? '이름 없는 사건';
+  const menuOpen = anchor !== null;
+
+  const openMenu = () => {
+    const rect = rowRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setFlipped(false);
+    setAnchor({
+      top: rect.top,
+      bottom: rect.bottom,
+      left: rect.left,
+      viewportH: window.innerHeight,
+    });
+  };
 
   if (editing) {
     return (
@@ -73,8 +129,9 @@ export function CaseRow({
   }
 
   return (
-    <div className="relative">
+    <div>
       <div
+        ref={rowRef}
         className={cn(
           'group flex min-h-11 flex-col items-stretch gap-1 rounded-md px-3 py-2',
           selected ? 'border border-line-2 bg-surface' : 'hover:bg-bg',
@@ -91,7 +148,7 @@ export function CaseRow({
             type="button"
             aria-label={`${title} 메뉴`}
             aria-expanded={menuOpen}
-            onClick={() => setMenuOpen((v) => !v)}
+            onClick={() => (menuOpen ? setAnchor(null) : openMenu())}
             className={cn(
               '-mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-muted',
               'hover:bg-bg-2 focus-visible:opacity-100 group-hover:opacity-100',
@@ -104,18 +161,24 @@ export function CaseRow({
         <StatusBadge status={item.status} className="self-start" />
       </div>
 
-      {menuOpen && (
+      {anchor && (
         <>
           {/* 바깥을 누르면 닫히도록 투명 클릭 캐처를 깐다 (h09 핸드오프 메모) */}
           <button
             type="button"
             aria-label="메뉴 닫기"
             className="fixed inset-0 z-10 cursor-default"
-            onClick={() => setMenuOpen(false)}
+            onClick={() => setAnchor(null)}
           />
           <div
+            ref={menuRef}
             role="menu"
-            className="absolute top-full left-2 z-20 mt-1 w-46 overflow-hidden rounded-md border border-line bg-surface py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+            style={
+              flipped
+                ? { bottom: anchor.viewportH - anchor.top + GAP, left: anchor.left + INSET }
+                : { top: anchor.bottom + GAP, left: anchor.left + INSET }
+            }
+            className="fixed z-20 w-46 overflow-hidden rounded-md border border-line bg-surface py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
           >
             <p className="mb-1 truncate border-b border-line-2 px-4 py-2 text-[12px] leading-[1.35] text-muted">
               {title}
@@ -126,7 +189,7 @@ export function CaseRow({
               onClick={() => {
                 setDraft(item.title ?? '');
                 setEditing(true);
-                setMenuOpen(false);
+                setAnchor(null);
               }}
               className="flex min-h-11 w-full items-center px-4 py-3 text-[13.5px] text-ink hover:bg-bg"
             >
@@ -137,7 +200,7 @@ export function CaseRow({
               role="menuitem"
               onClick={() => {
                 onHistory();
-                setMenuOpen(false);
+                setAnchor(null);
               }}
               className="flex min-h-11 w-full items-center px-4 py-3 text-[13.5px] text-ink hover:bg-bg"
             >
@@ -148,7 +211,7 @@ export function CaseRow({
               role="menuitem"
               onClick={() => {
                 onDelete();
-                setMenuOpen(false);
+                setAnchor(null);
               }}
               className="mt-1 flex min-h-11 w-full items-center border-t border-line-2 px-4 py-3 text-[13.5px] text-danger hover:bg-danger-fill"
             >
