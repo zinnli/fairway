@@ -15,6 +15,9 @@ import { zodResolver } from '@/lib/zodResolver';
  * h40은 라우트가 아니라 이 화면 안의 모달이다.
  *
  * 가입 성공 = 바로 로그인 상태로 사건 목록 도착. 다시 로그인시키지 않는다 (03 유저플로우 F0).
+ * 처음 온 사람이므로 목록 위에 온보딩(h06~h07)을 얹은 상태로 보낸다. 01 화면색인이 묶어 둔
+ * "첫 화면 → 로그인·회원가입 → 온보딩" 순서다. 로그인으로 다시 오는 사람에겐 띄우지 않는다.
+ * replace로 가서 뒤로가기가 가입 폼으로 돌아가지 않게 한다.
  * 이메일 중복은 서버가 판정하는데 Api 계약(src/api/types.ts)에 인증이 아직 없다.
  * 자리는 duplicateEmail로 잡아 뒀고, 인증이 붙으면 그 값만 켜면 h05가 그대로 나온다.
  *
@@ -65,7 +68,7 @@ export function SignupPage() {
 
   const onSubmit = handleSubmit(() => {
     setDuplicateEmail(null);
-    navigate('/cases');
+    navigate('/onboarding', { replace: true });
   });
 
   return (

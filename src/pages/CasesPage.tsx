@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
@@ -10,11 +11,18 @@ import { useCaseStore } from '@/store/caseStore';
  *
  * ★ 사건이 있을 때의 오른쪽 칸은 시안에 없다(h09부터는 작업 화면이 차지한다).
  *   문구 두 줄만 새로 썼고, 디자인 담당 확인이 필요하다.
+ *
+ * 사건이 0개면 온보딩으로 보낸다. 닫고 돌아온 사람은 다시 던지지 않고 h08 빈 상태를 보여 준다 —
+ * 안 그러면 온보딩과 목록 사이를 오가며 갇힌다.
  */
 export function CasesPage() {
   const navigate = useNavigate();
-  const { list, loaded, create } = useCaseStore();
+  const { list, loaded, create, onboardingSeen } = useCaseStore();
   const empty = loaded && list.length === 0;
+
+  useEffect(() => {
+    if (empty && !onboardingSeen) navigate('/onboarding', { replace: true });
+  }, [empty, onboardingSeen, navigate]);
 
   return (
     <div className="flex h-dvh bg-bg-3">

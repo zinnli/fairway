@@ -5,11 +5,14 @@ import { Disclaimer } from '@/components/ui/Disclaimer';
 import { Icon } from '@/components/ui/Icon';
 import { SLIDES } from '@/features/onboarding/slides';
 import { cn } from '@/lib/cn';
+import { useCaseStore } from '@/store/caseStore';
 
 /**
  * 온보딩 3단 — h06 · h06b · h07 (모바일 m03).
  * PC는 사건 목록 위에 뜨는 640 모달, 모바일은 전체 화면 한 장이다.
  * 어디서 끝내든 사건 목록으로 간다. 건너뛰기는 항상 열려 있다.
+ * 가입 직후, 그리고 사건이 0개인 목록에 닿을 때마다 여기로 온다(SignupPage · CasesPage).
+ * 닫으면 봤다고 표시해서 빈 목록으로 도로 튕기지 않게 하고, replace라 뒤로가기로도 다시 열리지 않는다.
  */
 
 /** 넘김 표시 — 지금 장은 20×8 알약, 나머지는 8×8. 부품 규격이라 4배수 예외 */
@@ -42,7 +45,12 @@ export function OnboardingPage() {
   const slide = SLIDES[index]!;
   const isLast = index === SLIDES.length - 1;
 
-  const finish = () => navigate('/cases');
+  const markSeen = useCaseStore((s) => s.markOnboardingSeen);
+
+  const finish = () => {
+    markSeen();
+    navigate('/cases', { replace: true });
+  };
 
   return (
     <div className="relative flex min-h-dvh bg-bg-3">

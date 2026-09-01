@@ -9,6 +9,9 @@ import type { CaseSummary } from '@/domain/case';
 interface CaseState {
   list: CaseSummary[];
   loaded: boolean;
+  /** 이번에 온보딩을 닫았는지. 사건이 0개여도 다시 던지지 않으려고 둔다 */
+  onboardingSeen: boolean;
+  markOnboardingSeen: () => void;
   load: () => Promise<void>;
   create: () => Promise<string>;
   rename: (caseId: string, title: string) => Promise<void>;
@@ -18,6 +21,9 @@ interface CaseState {
 export const useCaseStore = create<CaseState>((set, get) => ({
   list: [],
   loaded: false,
+  onboardingSeen: false,
+
+  markOnboardingSeen: () => set({ onboardingSeen: true }),
 
   load: async () => {
     const list = await api.listCases();
