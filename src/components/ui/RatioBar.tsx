@@ -22,18 +22,38 @@ export function RatioBar({
           {formatRatio(ratio)}
         </span>
       </div>
+      <RatioTrack ratio={ratio} emphasis={emphasis} label={label} />
+    </div>
+  );
+}
+
+/**
+ * 막대만. 현황판(h21)처럼 위에 이름·숫자 줄이 따로 있는 곳에서 쓴다.
+ * 높이 8/10은 간격이 아니라 부품 규격이라 4배수 예외.
+ */
+export function RatioTrack({
+  ratio,
+  emphasis = false,
+  label,
+  className,
+}: {
+  ratio: Ratio;
+  emphasis?: boolean;
+  label: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={`flex overflow-hidden rounded-full bg-track ${className ?? ''}`}
+      style={{ height: emphasis ? 10 : 8 }}
+      role="img"
+      aria-label={`${label} ${formatRatio(ratio)}`}
+    >
+      <div style={{ width: `${ratio.mine}%` }} className="h-full bg-transparent" />
       <div
-        className="flex overflow-hidden rounded-full bg-track"
-        style={{ height: emphasis ? 10 : 8 }}
-        role="img"
-        aria-label={`${label} ${formatRatio(ratio)}`}
-      >
-        <div style={{ width: `${ratio.mine}%` }} className="h-full bg-transparent" />
-        <div
-          style={{ width: `${ratio.opponent}%` }}
-          className={emphasis ? 'h-full bg-brand' : 'h-full bg-brand-line'}
-        />
-      </div>
+        style={{ width: `${ratio.opponent}%` }}
+        className={emphasis ? 'h-full bg-brand' : 'h-full bg-brand-line'}
+      />
     </div>
   );
 }

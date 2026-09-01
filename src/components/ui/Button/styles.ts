@@ -6,7 +6,7 @@ import { cn } from '@/lib/cn';
  * 잠금은 opacity가 아니라 색 교체다. opacity를 쓰면 정의에 없는 연보라가 생긴다.
  */
 
-export type ButtonVariant = 'primary' | 'secondary' | 'icon' | 'link';
+export type ButtonVariant = 'primary' | 'secondary' | 'danger' | 'icon' | 'link';
 export type ButtonSize = 'lg' | 'md' | 'sm';
 
 const base =
@@ -22,6 +22,11 @@ const variants: Record<ButtonVariant, string> = {
   secondary:
     'bg-surface text-ink border border-line ' +
     'hover:bg-bg hover:border-brand-line active:bg-brand-tint ' +
+    'disabled:bg-bg-2 disabled:text-disabled disabled:border-line',
+  danger:
+    // scp2 — 되돌릴 수 없는 행동. 면을 채우지 않고 글자·테두리로만 말한다
+    'bg-surface text-danger border border-danger-line ' +
+    'hover:bg-danger-fill active:bg-danger-fill ' +
     'disabled:bg-bg-2 disabled:text-disabled disabled:border-line',
   icon:
     'text-muted rounded-lg hover:bg-bg-2 ' +
@@ -47,6 +52,6 @@ export function buttonClass({
   size?: ButtonSize;
   className?: string;
 } = {}): string {
-  const isBox = variant === 'primary' || variant === 'secondary';
+  const isBox = variant !== 'icon' && variant !== 'link';
   return cn(base, variants[variant], isBox && sizes[size], className);
 }
