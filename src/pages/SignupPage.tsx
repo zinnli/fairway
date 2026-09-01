@@ -17,16 +17,23 @@ import { zodResolver } from '@/lib/zodResolver';
  * 가입 성공 = 바로 로그인 상태로 사건 목록 도착. 다시 로그인시키지 않는다 (03 유저플로우 F0).
  * 이메일 중복은 서버가 판정하는데 Api 계약(src/api/types.ts)에 인증이 아직 없다.
  * 자리는 duplicateEmail로 잡아 뒀고, 인증이 붙으면 그 값만 켜면 h05가 그대로 나온다.
+ *
+ * 가입 버튼은 입력 세 칸과 필수 동의 세 개가 모두 찼을 때만 열린다.
+ * 잠금은 opacity가 아니라 색 교체이고(Button), 왜 잠겼는지는 버튼 아래 한 줄로 말한다.
  */
 
 const schema = z
   .object({
-    email: z.email('이메일 형식이 맞지 않아요.'),
+    email: z
+      .string()
+      .min(1, '이메일을 입력해 주세요.')
+      .pipe(z.email('이메일 형식이 맞지 않아요.')),
     password: z
       .string()
+      .min(1, '비밀번호를 입력해 주세요.')
       .min(8, '비밀번호가 짧아요. 8자 이상, 숫자를 섞어 다시 입력해 주세요.')
       .regex(/[0-9]/, '비밀번호가 짧아요. 8자 이상, 숫자를 섞어 다시 입력해 주세요.'),
-    passwordConfirm: z.string(),
+    passwordConfirm: z.string().min(1, '비밀번호를 한 번 더 입력해 주세요.'),
   })
   .refine((v) => v.password === v.passwordConfirm, {
     path: ['passwordConfirm'],
@@ -49,11 +56,12 @@ export function SignupPage() {
     register,
     handleSubmit,
     getValues,
-    formState: { errors },
-  } = useForm<Form>({ resolver: zodResolver(schema) });
+    formState: { errors, isValid },
+  } = useForm<Form>({ resolver: zodResolver(schema), mode: 'onTouched' });
 
-  /** 확인된 동의 개수는 저장하지 않고 파생한다 */
+  /** 채워졌는지·동의했는지는 저장하지 않고 매번 파생한다 */
   const allAgreed = TERM_ORDER.every((key) => agreed[key]);
+  const canSubmit = isValid && allAgreed;
 
   const onSubmit = handleSubmit(() => {
     setDuplicateEmail(null);
@@ -106,12 +114,14 @@ export function SignupPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Button type="submit" size="lg" disabled={!allAgreed}>
+          <Button type="submit" size="lg" disabled={!canSubmit}>
             가입하기
           </Button>
-          {!allAgreed && (
+          {!canSubmit && (
             <p className="text-center text-[12.5px] leading-[1.5] text-muted">
-              필수 3가지에 모두 체크하면 가입할 수 있어요.
+              {isValid
+                ? '필수 3가지에 모두 체크하면 가입할 수 있어요.'
+                : '이메일과 비밀번호를 모두 채우면 가입할 수 있어요.'}
             </p>
           )}
         </div>
