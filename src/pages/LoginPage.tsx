@@ -46,10 +46,12 @@ export function LoginPage() {
           {...register('email')}
         />
         <div className="flex flex-col gap-1">
+          {/* 비밀번호 칸은 안내 문구 대신 가린 글자 모양을 보여 준다 (h02·m02) */}
           <Field
             label="비밀번호"
             type="password"
             autoComplete="current-password"
+            placeholder="••••••••"
             error={errors.password?.message}
             {...register('password')}
           />
