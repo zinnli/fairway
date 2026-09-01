@@ -26,7 +26,13 @@ function seedCase(over: Partial<Case> & Pick<Case, 'id' | 'title' | 'status'>): 
   };
 }
 
-export const DEMO_CASES: Case[] = [
+/**
+ * ★ 임시 — 화면 확인 동안 빈 목록(h08·온보딩)을 보려고 꺼 뒀다.
+ *   시연 전에 true로 되돌린다. 데이터는 아래에 그대로 남아 있다.
+ */
+const SEED = false;
+
+const SEEDED: Case[] = [
   seedCase({
     id: 'case-0822',
     title: '교차로 직진 충돌 · 08-22',
@@ -44,6 +50,8 @@ export const DEMO_CASES: Case[] = [
     updatedAt: '2026-07-14T09:00:00+09:00',
   }),
 ];
+
+export const DEMO_CASES: Case[] = SEED ? SEEDED : [];
 
 export const toSummary = (c: Case): CaseSummary => ({
   id: c.id,
