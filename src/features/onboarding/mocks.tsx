@@ -8,6 +8,7 @@ import { formatRatio, type Ratio } from '@/domain/verdict';
  *
  * ★ 모바일 시안(m03)은 1장만 그려져 있고 그림 구성이 PC와 다르다.
  *   2·3장 모바일 그림이 없어 PC 그림을 폭만 줄여 함께 쓴다.
+ * ★ 시안은 장마다 그림 폭이 420·400·380으로 다르다. 넘길 때마다 크기가 흔들려 420으로 통일했다.
  */
 
 const EXAMPLE_RATIO: Ratio = { mine: 0, opponent: 100 };
@@ -55,7 +56,7 @@ export function ChatMock() {
 
 export function VerdictMock() {
   return (
-    <div className="flex w-full max-w-100 flex-col gap-2 rounded-lg bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)]">
+    <div className="flex w-full max-w-105 flex-col gap-2 rounded-lg bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)]">
       <p className="text-[12px] font-medium tracking-[0.6px] text-muted">예상 과실비율</p>
       <p
         className="tnum flex items-baseline gap-1"
@@ -92,7 +93,7 @@ export function VerdictMock() {
 
 export function StatementMock() {
   return (
-    <div className="flex w-full max-w-95 flex-col gap-2 rounded-lg bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)]">
+    <div className="flex w-full max-w-105 flex-col gap-2 rounded-lg bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)]">
       <div className="flex items-center gap-2">
         <span className="min-w-0 flex-1 text-[14px] font-semibold text-ink">사건경위서</span>
         <Pill>두 번째 버전 · 2장</Pill>

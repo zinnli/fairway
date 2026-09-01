@@ -10,15 +10,18 @@ import { SLIDES } from './slides';
  * 시안이 사건 목록 위에 덮인 640 모달로 그렸으므로 라우트가 아니라 모달이다.
  * 뒤에는 진짜 사이드바가 비친다. 모바일에서는 전체 화면 한 장이 된다.
  *
+ * 보라 그림 상자는 PC 300 · 모바일 280 고정이다. 남는 자리를 먹게 두면 장마다 높이가 달라져
+ * 넘길 때 그림이 커졌다 작아졌다 한다. 모바일은 대신 위아래 여백이 늘어난다(m03).
+ *
  * 네이티브 <dialog>라 포커스 트랩·Esc·inert가 브라우저 기본으로 온다.
  * Esc는 건너뛰기와 같다 — 어디서 끝내든 닫히기만 하고 사건 목록이 드러난다.
  */
 
 /** 넘김 표시 — 지금 장은 20×8 알약, 나머지는 8×8. 부품 규격이라 4배수 예외 */
-function SlideDots({ index }: { index: number }) {
+function SlideDots({ index, className }: { index: number; className?: string }) {
   return (
     <div
-      className="flex items-center gap-2"
+      className={cn('flex items-center gap-2', className)}
       role="progressbar"
       aria-valuenow={index + 1}
       aria-valuemin={1}
@@ -64,11 +67,11 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
       className={cn(
         'm-0 h-dvh max-h-none w-full max-w-none bg-bg-3 p-6 text-ink',
         'backdrop:bg-[rgba(15,18,24,.55)]',
-        'sm:m-auto sm:h-auto sm:max-h-[calc(100dvh-32px)] sm:w-160 sm:max-w-[calc(100vw-32px)]',
+        'sm:m-auto sm:h-fit sm:max-h-[calc(100dvh-32px)] sm:w-172 sm:max-w-[calc(100vw-32px)]',
         'sm:overflow-y-auto sm:rounded-lg sm:bg-surface sm:shadow-[0_8px_24px_rgba(0,0,0,0.14)]',
       )}
     >
-      <div className="flex h-full min-w-0 flex-col sm:h-auto sm:p-6">
+      <div className="flex h-full min-w-0 flex-col outline-none sm:h-auto" tabIndex={-1} autoFocus>
         {/* 모바일은 머리에 글자 링크만 (m03) */}
         <div className="flex justify-end sm:hidden">
           <button
@@ -80,7 +83,7 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
           </button>
         </div>
 
-        <div className="relative flex flex-1 items-center justify-center rounded-lg bg-brand-tint p-4 sm:h-75 sm:flex-none sm:rounded-none">
+        <div className="relative flex h-70 flex-none items-center justify-center rounded-lg bg-brand-tint p-4 max-sm:mt-auto sm:h-75 sm:rounded-none">
           {slide.art}
 
           {slide.artBadge && <div className="absolute top-5 left-5">{slide.artBadge}</div>}
@@ -112,7 +115,7 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
           <p className="text-center text-[14px] leading-[1.6] text-ink-3 sm:text-[15px]">
             {slide.desc}
           </p>
-          <SlideDots index={index} />
+          <SlideDots index={index} className="max-sm:mt-auto" />
           {slide.disclaimer && <Disclaimer className="text-center text-[12.5px]" />}
 
           <div
@@ -122,17 +125,21 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
             )}
           >
             {index > 0 && (
-              <Button variant="secondary" onClick={() => setIndex(index - 1)}>
+              <Button
+                variant="secondary"
+                onClick={() => setIndex(index - 1)}
+                className="max-sm:shrink-0"
+              >
                 이전
               </Button>
             )}
             {isLast ? (
-              <Button size="lg" onClick={onClose} className="max-sm:w-full">
+              <Button size="lg" onClick={onClose} className="max-sm:flex-1">
                 <Icon name="plus" size={16} strokeWidth={2} />
                 새 사건 만들기
               </Button>
             ) : (
-              <Button onClick={() => setIndex(index + 1)} className="max-sm:w-full">
+              <Button onClick={() => setIndex(index + 1)} className="max-sm:flex-1">
                 다음
               </Button>
             )}
