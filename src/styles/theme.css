@@ -40,6 +40,7 @@
   --color-danger-fill:  #FAEDEB;
 
   /* 반경 */
+  --radius-xs:  4px;   /* 말풍선 꼬리 쪽 모서리 */
   --radius-sm:  8px;
   --radius-md:  12px;
   --radius-lg:  16px;
