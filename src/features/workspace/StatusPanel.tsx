@@ -1,4 +1,5 @@
 import { Icon } from '@/components/ui/Icon';
+import { DISCLAIMER } from '@/config';
 import { RatioTrack } from '@/components/ui/RatioBar';
 import { StageIcon } from '@/components/ui/StageIcon';
 import { STAGE_LABELS, type Case } from '@/domain/case';
@@ -76,26 +77,30 @@ export function StatusPanel({
   const ratio = item.verdict?.ratio ?? null;
   const statementValue = item.stages.statement === '완료' ? '만듦' : '아직 없음';
   const rebuttalValue =
-    item.stages.statement === '완료' ? '보낼 수 있어요' : '잠김 · 경위서를 만들면 열려요';
+    item.stages.statement === '완료' ? '보낼 수 있어요' : '잠김 · 판정과 경위서가 먼저예요';
 
   return (
     <div className="flex h-full w-85 shrink-0 flex-col overflow-hidden border-l border-line bg-bg">
       <h2 className="flex-none px-5 pt-4 pb-3 text-[15px] font-bold text-ink">사건 현황판</h2>
 
       <div className="panel-scroll flex flex-1 flex-col gap-6 px-5 pb-4">
-        {ratio && (
-          <div className="flex-none rounded-lg bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)]">
-            <p className="mb-1 text-[12px] font-semibold text-muted">예상 과실비율</p>
-            <p
-              className="tnum text-[26px] font-bold tracking-[-0.02em] text-ink"
-              aria-label={formatRatio(ratio)}
-            >
-              나 {ratio.mine} <span className="font-normal text-muted">:</span> 상대{' '}
-              {ratio.opponent}
-            </p>
-            <RatioTrack ratio={ratio} emphasis label="예상 과실비율" className="mt-2" />
-          </div>
-        )}
+        <div className="flex-none rounded-lg bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)]">
+          <p className="mb-1 text-[12px] font-semibold text-muted">예상 과실비율</p>
+          {ratio ? (
+            <>
+              <p
+                className="tnum text-[26px] font-bold tracking-[-0.02em] text-ink"
+                aria-label={formatRatio(ratio)}
+              >
+                나 {ratio.mine} <span className="font-normal text-muted">:</span> 상대{' '}
+                {ratio.opponent}
+              </p>
+              <RatioTrack ratio={ratio} emphasis label="예상 과실비율" className="mt-2" />
+            </>
+          ) : (
+            <p className="text-[13.5px] text-muted">아직 판정 전이에요.</p>
+          )}
+        </div>
 
         <div className="flex flex-col gap-2">
           <SectionTitle icon="clock">진행 단계</SectionTitle>
@@ -120,27 +125,33 @@ export function StatusPanel({
           })}
         </div>
 
-        {item.facts.length > 0 && (
-          <div className="flex flex-col gap-2">
-            <SectionTitle icon="checkCircle">{factCountLabel(item.facts)}</SectionTitle>
-            <div className="flex items-center gap-3 text-[12px] leading-[1.35] text-muted">
-              {(['video', 'statement', 'unknown'] as FactSource[]).map((source) => (
-                <span key={source} className="inline-flex items-center gap-1">
-                  <span
-                    className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT[source])}
-                    aria-hidden
-                  />
-                  {source === 'statement' ? '내가 말함' : FACT_SOURCE_LABEL[source]}
-                </span>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-1">
-              {item.facts.map((fact) => (
-                <FactChip key={fact.key} fact={fact} />
-              ))}
-            </div>
-          </div>
-        )}
+        <div className="flex flex-col gap-2">
+          <SectionTitle icon="checkCircle">
+            {item.facts.length > 0 ? factCountLabel(item.facts) : '확인된 사실'}
+          </SectionTitle>
+          {item.facts.length === 0 ? (
+            <p className="text-[13.5px] text-muted">영상을 올리면 여기에 쌓여요.</p>
+          ) : (
+            <>
+              <div className="flex items-center gap-3 text-[12px] leading-[1.35] text-muted">
+                {(['video', 'statement', 'unknown'] as FactSource[]).map((source) => (
+                  <span key={source} className="inline-flex items-center gap-1">
+                    <span
+                      className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT[source])}
+                      aria-hidden
+                    />
+                    {source === 'statement' ? '내가 말함' : FACT_SOURCE_LABEL[source]}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-wrap gap-1">
+                {item.facts.map((fact) => (
+                  <FactChip key={fact.key} fact={fact} />
+                ))}
+              </div>
+            </>
+          )}
+        </div>
 
         <div className="flex flex-col gap-1">
           <SectionTitle icon="file">서류</SectionTitle>
@@ -157,6 +168,10 @@ export function StatusPanel({
           변경 이력 보기
         </button>
       </div>
+
+      <p className="flex-none border-t border-line px-5 py-3 text-[12.5px] leading-[1.5] text-muted">
+        {DISCLAIMER}
+      </p>
     </div>
   );
 }
