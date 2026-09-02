@@ -26,6 +26,16 @@ export const STAGE_LABELS: { key: keyof Stages; label: string }[] = [
   { key: 'rebuttal', label: '반박의견서' },
 ];
 
+/**
+ * 모바일 머리띠가 가리키는 "지금 단계" — 아직 끝나지 않은 첫 단계다.
+ * 저장하지 않고 stages에서 파생한다. 상태로 들면 재판정 때 어긋난다.
+ */
+export function currentStage(stages: Stages): { step: number; steps: number; label: string } {
+  const found = STAGE_LABELS.findIndex(({ key }) => stages[key] !== '완료');
+  const at = found === -1 ? STAGE_LABELS.length - 1 : found;
+  return { step: at + 1, steps: STAGE_LABELS.length, label: STAGE_LABELS[at].label };
+}
+
 export interface VideoRef {
   id: string;
   name: string;

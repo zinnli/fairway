@@ -1,11 +1,11 @@
 /**
- * 모바일 진행 띠 — 11_DesignSystem.html 9-0.
- * 채움 = 지금까지 온 단계(지금 포함) · 테두리 = 다음 단계.
+ * 모바일 진행 띠 — m05 머리띠 규격(12px · 간격 8).
+ * 채움 = 지금까지 온 단계(지금 포함) · 나머지는 흰 바탕에 가는 테두리.
  */
 export function StepDots({ step, steps, label }: { step: number; steps: number; label: string }) {
   return (
     <div
-      className="flex items-center gap-1"
+      className="flex items-center gap-2"
       role="progressbar"
       aria-valuenow={step}
       aria-valuemin={1}
@@ -24,10 +24,10 @@ export function StepDots({ step, steps, label }: { step: number; steps: number; 
             aria-hidden
             className={
               filled
-                ? 'h-1.5 w-1.5 rounded-full bg-brand'
+                ? 'h-3 w-3 rounded-full bg-brand'
                 : next
-                  ? 'h-1.5 w-1.5 rounded-full border border-brand'
-                  : 'h-1.5 w-1.5 rounded-full bg-line'
+                  ? 'box-border h-3 w-3 rounded-full border border-brand-line bg-surface'
+                  : 'box-border h-3 w-3 rounded-full border border-line bg-surface'
             }
           />
         );
