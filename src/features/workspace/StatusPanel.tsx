@@ -3,13 +3,16 @@ import { DISCLAIMER } from '@/config';
 import { RatioTrack } from '@/components/ui/RatioBar';
 import { StageIcon } from '@/components/ui/StageIcon';
 import { STAGE_LABELS, type Case } from '@/domain/case';
+import type { Rebuttal, Statement } from '@/domain/document';
+import { versionLabel } from '@/lib/document';
 import { FACT_SOURCE_LABEL, factCountLabel, type Fact, type FactSource } from '@/domain/fact';
 import { formatRatio } from '@/domain/verdict';
 import { cn } from '@/lib/cn';
 
 /**
  * HiStatus — 원본에 data-sc-name="HiStatus"로 표시된 부품. 25화면이 이것을 공유한다.
- * 폭 340 고정. 1280 미만에서는 오른쪽 서랍으로 접히고, 그 껍데기는 작업 화면이 씌운다.
+ * 폭 340 고정. 1280 미만에서는 접히는데, 768 이상은 오른쪽 서랍이고 그 아래는
+ * 아래에서 올라오는 시트다(m09). 껍데기는 작업 화면이 씌운다.
  *
  * 확인된 사실 개수는 저장하지 않고 factCountLabel()로 파생한다.
  */
@@ -46,41 +49,82 @@ function SectionTitle({ icon, children }: { icon: 'clock' | 'checkCircle' | 'fil
   );
 }
 
-/** 서류 줄 — scp5라 최소 높이 44 */
-function DocRow({ label, value, onOpen }: { label: string; value: string; onOpen: () => void }) {
+/**
+ * 서류 줄 — scp5라 최소 높이 44.
+ * 열 서류가 없으면 진짜로 잠근다. 눌러도 아무 일이 없는 단추를 두지 않는다.
+ * 잠금은 opacity가 아니라 색 교체다.
+ */
+function DocRow({
+  label,
+  value,
+  disabled,
+  onOpen,
+}: {
+  label: string;
+  value: string;
+  disabled?: boolean;
+  onOpen: () => void;
+}) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="-mx-2 flex min-h-11 items-start gap-2 rounded-sm px-2 py-2 text-left text-[13.5px] hover:bg-bg-2"
+      disabled={disabled}
+      className="-mx-2 flex min-h-11 items-start gap-2 rounded-sm px-2 py-2 text-left text-[13.5px] hover:bg-bg-2 disabled:bg-transparent disabled:text-disabled disabled:hover:bg-transparent"
     >
-      <span className="w-20 shrink-0 text-ink-3">{label}</span>
-      <span className="min-w-0 flex-1 leading-[1.4] text-ink">{value}</span>
-      <span className="flex shrink-0 text-muted" aria-hidden>
-        <Icon name="chevronRight" size={14} />
+      <span className={cn('w-20 shrink-0', disabled ? 'text-disabled' : 'text-ink-3')}>{label}</span>
+      <span className={cn('min-w-0 flex-1 leading-[1.4]', disabled ? 'text-disabled' : 'text-ink')}>
+        {value}
       </span>
+      {!disabled && (
+        <span className="flex shrink-0 text-muted" aria-hidden>
+          <Icon name="chevronRight" size={14} />
+        </span>
+      )}
     </button>
   );
 }
 
 export function StatusPanel({
   item,
+  statement,
+  rebuttal,
+  showDisclaimer,
   onOpenStatement,
   onOpenRebuttal,
   onOpenHistory,
 }: {
   item: Case;
+  /** 지금까지 만들어진 서류. 없으면 "만들기"가 되고, 만들 수도 없으면 잠긴다 */
+  statement: Statement | null;
+  rebuttal: Rebuttal | null;
+  /** 참고용 고지는 화면당 한 번만(규칙 0.2). 대화 카드가 이미 달고 있으면 여기선 뺀다 */
+  showDisclaimer: boolean;
   onOpenStatement: () => void;
   onOpenRebuttal: () => void;
   onOpenHistory: () => void;
 }) {
   const ratio = item.verdict?.ratio ?? null;
-  const statementValue = item.stages.statement === '완료' ? '만듦' : '아직 없음';
-  const rebuttalValue =
-    item.stages.statement === '완료' ? '보낼 수 있어요' : '잠김 · 판정과 경위서가 먼저예요';
+
+  /* 줄 하나가 세 가지 상태를 가진다 — 잠김 / 눌러서 만들기 / 눌러서 열기.
+     "보낼 수 있어요"라고 써 놓고 눌리지 않는 줄을 만들지 않는다 */
+  const statementRow = statement
+    ? { value: `${versionLabel(statement.version)} · ${statement.pageCount}장`, locked: false }
+    : item.verdict
+      ? { value: '아직 없음 · 눌러서 만들기', locked: false }
+      : { value: '잠김 · 판정이 먼저예요', locked: true };
+
+  const rebuttalRow = rebuttal
+    ? {
+        value: rebuttal.sentAt ? '발송 완료' : '보낼 수 있어요',
+        locked: false,
+      }
+    : statement
+      ? { value: '이제 만들 수 있어요', locked: false }
+      : { value: '잠김 · 판정과 경위서가 먼저예요', locked: true };
 
   return (
-    <div className="flex h-full w-85 shrink-0 flex-col overflow-hidden border-l border-line bg-bg">
+    <div className="flex h-full w-full shrink-0 flex-col overflow-hidden border-line bg-bg sm:w-85 sm:border-l">
       <h2 className="flex-none px-5 pt-4 pb-3 text-[15px] font-bold text-ink">사건 현황판</h2>
 
       <div className="panel-scroll flex flex-1 flex-col gap-6 px-5 pb-4">
@@ -155,8 +199,18 @@ export function StatusPanel({
 
         <div className="flex flex-col gap-1">
           <SectionTitle icon="file">서류</SectionTitle>
-          <DocRow label="사건경위서" value={statementValue} onOpen={onOpenStatement} />
-          <DocRow label="반박의견서" value={rebuttalValue} onOpen={onOpenRebuttal} />
+          <DocRow
+            label="사건경위서"
+            value={statementRow.value}
+            disabled={statementRow.locked}
+            onOpen={onOpenStatement}
+          />
+          <DocRow
+            label="반박의견서"
+            value={rebuttalRow.value}
+            disabled={rebuttalRow.locked}
+            onOpen={onOpenRebuttal}
+          />
         </div>
 
         <button
@@ -169,9 +223,11 @@ export function StatusPanel({
         </button>
       </div>
 
-      <p className="flex-none border-t border-line px-5 py-3 text-[12.5px] leading-[1.5] text-muted">
-        {DISCLAIMER}
-      </p>
+      {showDisclaimer && (
+        <p className="flex-none border-t border-line px-5 py-3 text-[12.5px] leading-[1.5] text-muted">
+          {DISCLAIMER}
+        </p>
+      )}
     </div>
   );
 }

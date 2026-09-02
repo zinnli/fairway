@@ -4,6 +4,7 @@ import { BrandMark } from '@/components/ui/BrandMark';
 import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
+import { cn } from '@/lib/cn';
 import { useCaseStore } from '@/store/caseStore';
 import { CaseRow } from './CaseRow';
 
@@ -13,7 +14,14 @@ import { CaseRow } from './CaseRow';
  *
  * 폭 260 고정. 1024 미만에서는 왼쪽 서랍으로 접히는데, 그 껍데기는 작업 화면이 씌운다.
  */
-export function Sidebar({ selectedId }: { selectedId?: string }) {
+export function Sidebar({
+  selectedId,
+  width = 'w-65',
+}: {
+  selectedId?: string;
+  /** 붙박이는 260, 모바일 서랍은 300 (m04) */
+  width?: string;
+}) {
   const navigate = useNavigate();
   const { list, loaded, load, create, rename, remove } = useCaseStore();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
@@ -26,7 +34,7 @@ export function Sidebar({ selectedId }: { selectedId?: string }) {
   const deleting = list.find((c) => c.id === deleteTarget);
 
   return (
-    <aside className="flex h-full w-65 shrink-0 flex-col border-r border-line bg-bg">
+    <aside className={cn('flex h-full shrink-0 flex-col border-r border-line bg-bg', width)}>
       <div className="flex h-14 flex-none items-center gap-2 px-4">
         <BrandMark />
       </div>
