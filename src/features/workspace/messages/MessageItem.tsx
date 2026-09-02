@@ -23,7 +23,8 @@ export interface MessageActions {
   onCancelUpload: () => void;
   onStopAnalyze: () => void;
   onRetryAnalyze: () => void;
-  onFixFact: (key: FactKey, value: string | null) => void;
+  /** 고친 값을 확정한다. 그 카드도 새 값으로 갈아 끼워야 해서 카드 id를 같이 넘긴다 */
+  onFixFact: (messageId: string, key: FactKey, value: string | null) => void;
   onConfirmFacts: () => void;
   onAnswerQuestion: (field: FactKey, chip: Chip) => void;
   onOpenChart: () => void;
@@ -101,7 +102,7 @@ export function MessageItem({
       return (
         <FactsCard
           facts={message.facts}
-          onFix={actions.onFixFact}
+          onFix={(key, value) => actions.onFixFact(message.id, key, value)}
           onConfirm={actions.onConfirmFacts}
         />
       );

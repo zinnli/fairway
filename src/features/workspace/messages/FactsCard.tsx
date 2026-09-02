@@ -4,7 +4,6 @@ import { SelectChip } from '@/components/ui/Chip';
 import { FACTS_TITLE } from '@/domain/analysis';
 import { FACT_LABEL, type Fact, type FactKey } from '@/domain/fact';
 import { FACT_CHOICES } from '@/domain/questions';
-import { cn } from '@/lib/cn';
 
 /**
  * 사실 확인 — h18, 고치는 중은 h19.
@@ -76,11 +75,13 @@ export function FactsCard({
       <Button size="lg" className="mt-1 self-start" onClick={onConfirm} disabled={editing !== null}>
         {found}개 다 맞아요
       </Button>
-      <p className="text-[12.5px] text-muted">
-        {editing !== null
-          ? '고치는 중이에요. 저장하거나 취소하면 확정할 수 있어요.'
-          : unknown > 0 && `확인 필요 ${unknown}개는 이어서 여쭤볼게요`}
-      </p>
+      {(editing !== null || unknown > 0) && (
+        <p className="text-[12.5px] text-muted">
+          {editing !== null
+            ? '고치는 중이에요. 저장하거나 취소하면 확정할 수 있어요.'
+            : `확인 필요 ${unknown}개는 이어서 여쭤볼게요`}
+        </p>
+      )}
     </div>
   );
 }
@@ -109,7 +110,9 @@ function FactEditor({
         <span className="w-24 shrink-0 text-[13.5px] text-muted md:w-30">
           {FACT_LABEL[fact.key]}
         </span>
-        <span className="min-w-0 flex-1 text-[14px] text-ink">{fact.value}</span>
+        <span className="min-w-0 flex-1 text-[14px] text-ink">
+          {fact.source === 'unknown' ? '아직 몰라요' : fact.value}
+        </span>
         <span className="shrink-0 text-[12.5px] font-medium text-brand-press">고치는 중</span>
       </div>
 
@@ -151,7 +154,6 @@ function FactEditor({
           size="sm"
           disabled={!ready}
           onClick={() => onSave(chosen?.isUnknown ? null : value)}
-          className={cn(!ready && 'cursor-not-allowed')}
         >
           저장
         </Button>

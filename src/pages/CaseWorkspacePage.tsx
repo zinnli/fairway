@@ -344,14 +344,25 @@ export function CaseWorkspacePage() {
   /* 사실 카드에서 고친 값을 확정한다 (h19).
      판정에 쓰인 항목이면 patchFact가 재판정을 돌려주고, 그러면 h24 → h25로 이어진다 */
   const fixFact = useCallback(
-    async (key: FactKey, value: string | null) => {
+    async (messageId: string, key: FactKey, value: string | null) => {
+      /* 고친 결과를 그 사실 카드에도 되비춘다. 안 하면 카드는 만든 시점 값에 멈춰 있다 */
+      const showFresh = async () => {
+        const fresh = await api.getCase(caseId);
+        dispatch({
+          type: 'settle',
+          message: { id: messageId, at: now(), role: 'ai', kind: 'facts', facts: fresh.facts },
+        });
+      };
+
       if (value === null) {
         await api.answerQuestion(caseId, key, null);
+        await showFresh();
         await refresh();
         return;
       }
       const before = itemRef.current?.verdict?.ratio ?? null;
       const rejudged = await api.patchFact(caseId, key, value);
+      await showFresh();
       if (rejudged && before) {
         say(
           {
@@ -696,7 +707,7 @@ export function CaseWorkspacePage() {
                   onCancelUpload: () => uploadAbort.current?.abort(),
                   onStopAnalyze: stopAnalyze,
                   onRetryAnalyze: () => void startAnalyze(),
-                  onFixFact: (key, value) => void fixFact(key, value),
+                  onFixFact: (messageId, key, value) => void fixFact(messageId, key, value),
                   onConfirmFacts: confirmFacts,
                   onAnswerQuestion: answerQuestion,
                   onOpenChart: () => pop('chart'),
