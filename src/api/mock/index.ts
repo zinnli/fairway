@@ -14,7 +14,17 @@ import { DEMO_LOGS } from './demoLog';
 /** 메모리 저장소. 새로고침하면 시연 데이터로 돌아간다 */
 let cases: Case[] = [];
 let logs: Record<string, ChatMessage[]> = {};
-let nextId = 1;
+
+/**
+ * 목 전용 id — 서버가 붙는 날 이 함수만 지운다.
+ * UTC 밀리초를 36진수로 눕히고 난수 두 자를 붙인다.
+ * · 사전순 = 만든 순서 (목록을 id로도 줄 세울 수 있다)
+ * · 같은 밀리초에 두 번 눌러도 갈린다 ([새 사건] 연타)
+ * · 시차·서머타임과 무관하다
+ * 화면은 이 규칙을 몰라야 한다. 날짜가 필요하면 createdAt을 읽는다.
+ */
+const newCaseId = () =>
+  `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 4)}`;
 
 function loadDemo() {
   cases = DEMO_CASES.map((c) => ({ ...c }));
@@ -36,7 +46,7 @@ export const mockApi: Api = {
   createCase: async () => {
     const now = new Date().toISOString();
     const created: Case = {
-      id: `case-new-${nextId++}`,
+      id: newCaseId(),
       title: null, // 분석 뒤 AI가 붙인다
       status: '접수중',
       stages: emptyStages(),
@@ -86,6 +96,5 @@ export const mockApi: Api = {
   listHistory: todo('listHistory'),
   resetDemo: async () => {
     loadDemo();
-    nextId = 1;
   },
 };
