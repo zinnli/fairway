@@ -1,4 +1,5 @@
 import type { ChatMessage } from '@/domain/message';
+import { AiMessage, AiText } from './AiMessage';
 import { GuideCard } from './GuideCard';
 import { UserBubble } from './UserBubble';
 
@@ -16,7 +17,14 @@ export function MessageItem({ message, actions }: { message: ChatMessage; action
       return <GuideCard onPickVideo={actions.onPickVideo} />;
 
     case 'text':
-      return <UserBubble>{message.text}</UserBubble>;
+      // 같은 kind가 역할에 따라 말풍선이 되기도, 카드 없는 AI 답변이 되기도 한다
+      return message.role === 'user' ? (
+        <UserBubble>{message.text}</UserBubble>
+      ) : (
+        <AiMessage>
+          <AiText>{message.text}</AiText>
+        </AiMessage>
+      );
 
     case 'choice':
       return <UserBubble>{message.label}</UserBubble>;

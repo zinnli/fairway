@@ -25,7 +25,8 @@ type Base = { id: string; at: string };
 
 export type ChatMessage = Base &
   (
-    | { role: 'user'; kind: 'text'; text: string }
+    /* 그냥 하는 말. 내 말풍선(h13)과 카드 없는 AI 답변(h13·h16)이 같은 종류다 */
+    | { role: 'user' | 'ai'; kind: 'text'; text: string }
     | { role: 'user'; kind: 'video'; video: VideoRef }
     | { role: 'user'; kind: 'choice'; label: string; forField: FactKey }
     | { role: 'ai'; kind: 'guide' }
@@ -38,7 +39,7 @@ export type ChatMessage = Base &
     | { role: 'ai'; kind: 'rejudging'; from: Ratio; reason: string }
     | { role: 'ai'; kind: 'statementDraft'; doc: Statement }
     | { role: 'ai'; kind: 'rebuttalDraft'; doc: Rebuttal }
-    | { role: 'ai'; kind: 'sent'; at: string; to: string }
+    | { role: 'ai'; kind: 'sent'; to: string }
     | { role: 'ai'; kind: 'nextSteps' }
   );
 
