@@ -30,12 +30,22 @@ export type ChatMessage = Base &
     | { role: 'user'; kind: 'video'; video: VideoRef }
     | { role: 'user'; kind: 'choice'; label: string; forField: FactKey }
     | { role: 'ai'; kind: 'guide' }
-    | { role: 'ai'; kind: 'uploading'; progress: number; fileName: string }
-    | { role: 'ai'; kind: 'analyzing'; step: string }
+    | {
+        role: 'ai';
+        kind: 'uploading';
+        fileName: string;
+        sizeBytes: number;
+        progress: number;
+        /* 올라가는 중에는 그 자리에서 숫자만 바뀌고, 끝나면 video로 갈린다 */
+        state: 'uploading' | 'failed' | 'canceled';
+        note?: string;
+      }
+    | { role: 'ai'; kind: 'analyzing'; step: string; done?: boolean }
     | { role: 'ai'; kind: 'error'; code: ErrorCode; hint: string }
     | { role: 'ai'; kind: 'facts'; facts: Fact[] }
     | { role: 'ai'; kind: 'question'; field: FactKey; text: string; chips: Chip[] }
-    | { role: 'ai'; kind: 'verdict'; verdict: Verdict }
+    /* 재판정 결과(h25)는 별도 종류가 아니라 이전 비율이 붙은 판정 카드다 */
+    | { role: 'ai'; kind: 'verdict'; verdict: Verdict; previous?: Ratio }
     | { role: 'ai'; kind: 'rejudging'; from: Ratio; reason: string }
     | { role: 'ai'; kind: 'statementDraft'; doc: Statement }
     | { role: 'ai'; kind: 'rebuttalDraft'; doc: Rebuttal }
@@ -44,3 +54,9 @@ export type ChatMessage = Base &
   );
 
 export type MessageKind = ChatMessage['kind'];
+
+/**
+ * id·at 없이 알맹이만. 로그를 만들 때 쓴다.
+ * 유니온이라 그냥 Omit을 걸면 갈래가 뭉개진다 — 배분형으로 써야 한다.
+ */
+export type MessageBody<T = ChatMessage> = T extends unknown ? Omit<T, 'id' | 'at'> : never;

@@ -15,7 +15,10 @@ export type ChatAction =
   | { type: 'reset'; messages: ChatMessage[] }
   | { type: 'append'; message: ChatMessage }
   | { type: 'progress'; id: string; percent: number }
-  | { type: 'step'; id: string; label: string };
+  | { type: 'step'; id: string; label: string }
+  /** 진행 중이던 카드를 끝난 모양으로 갈아 끼운다 (업로드 완료·실패·분석 종료).
+   *  지우는 게 아니라 그 자리를 바꾸는 것이라 "추가만" 원칙과 어긋나지 않는다 */
+  | { type: 'settle'; message: ChatMessage };
 
 export const emptyChat: ChatState = { messages: [] };
 
@@ -39,6 +42,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
         messages: state.messages.map((m) =>
           m.id === action.id && m.kind === 'analyzing' ? { ...m, step: action.label } : m,
         ),
+      };
+
+    case 'settle':
+      return {
+        messages: state.messages.map((m) => (m.id === action.message.id ? action.message : m)),
       };
   }
 }

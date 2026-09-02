@@ -29,6 +29,8 @@ export interface Fact {
   confidence?: number;
   /** 판정 카드의 "쟁점" 줄로 이어지는 항목 */
   isDisputed?: boolean;
+  /** 확인 필요일 때 왜 못 읽었는지 (h18 "영상 각도로는 안 보여요") */
+  note?: string;
 }
 
 /**
