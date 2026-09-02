@@ -133,14 +133,16 @@ export function CaseRow({
       <div
         ref={rowRef}
         className={cn(
-          'group flex min-h-11 flex-col items-stretch gap-1 rounded-md px-3 py-2',
+          'group relative flex min-h-11 flex-col items-stretch gap-1 rounded-md px-3 py-2',
           selected ? 'border border-line-2 bg-surface' : 'hover:bg-bg',
         )}
       >
         <div className="flex items-center gap-2">
+          {/* ::after로 줄 전체를 덮는다. 제목 글자만이 아니라 배지·여백을 눌러도 열린다.
+              읽어 주는 이름은 제목 하나로 남고, 누를 수 있는 것끼리 겹치지도 않는다 */}
           <Link
             to={`/cases/${item.id}`}
-            className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink"
+            className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink after:absolute after:inset-0"
           >
             {title}
           </Link>
@@ -150,7 +152,8 @@ export function CaseRow({
             aria-expanded={menuOpen}
             onClick={() => (menuOpen ? setAnchor(null) : openMenu())}
             className={cn(
-              '-mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-muted',
+              // relative라야 줄을 덮은 ::after 위로 올라온다
+              'relative -mr-2 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm text-muted',
               'hover:bg-bg-2 focus-visible:opacity-100 group-hover:opacity-100',
               selected || menuOpen ? 'opacity-100' : 'opacity-0',
             )}
