@@ -94,7 +94,7 @@ export function Sidebar({ selectedId }: { selectedId?: string }) {
           if (deleteTarget === selectedId) navigate('/cases');
         }}
         title="사건을 삭제할까요?"
-        description={`"${deleting?.title ?? '이름 없는 사건'}"의 영상과 대화, 서류가 함께 지워지고 되돌릴 수 없어요.`}
+        description={`"${deleting?.title ?? '새 사건'}"의 영상과 대화, 서류가 함께 지워지고 되돌릴 수 없어요.`}
         confirmLabel="삭제"
         confirmVariant="danger"
       />

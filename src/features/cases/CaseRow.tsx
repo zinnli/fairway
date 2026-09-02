@@ -78,7 +78,7 @@ export function CaseRow({
     };
   }, [anchor]);
 
-  const title = item.title ?? '이름 없는 사건';
+  const title = item.title ?? '새 사건';
   const menuOpen = anchor !== null;
 
   const openMenu = () => {
