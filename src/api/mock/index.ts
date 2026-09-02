@@ -1,7 +1,9 @@
 import type { Case } from '@/domain/case';
 import { emptyStages } from '@/domain/case';
+import type { ChatMessage } from '@/domain/message';
 import type { Api, AnalyzeEvent } from '../types';
 import { DEMO_CASES, toSummary } from './demo';
+import { DEMO_LOGS } from './demoLog';
 
 /**
  * 목 구현 자리.
@@ -10,8 +12,15 @@ import { DEMO_CASES, toSummary } from './demo';
  */
 
 /** 메모리 저장소. 새로고침하면 시연 데이터로 돌아간다 */
-let cases: Case[] = DEMO_CASES.map((c) => ({ ...c }));
+let cases: Case[] = [];
+let logs: Record<string, ChatMessage[]> = {};
 let nextId = 1;
+
+function loadDemo() {
+  cases = DEMO_CASES.map((c) => ({ ...c }));
+  logs = Object.fromEntries(Object.entries(DEMO_LOGS).map(([id, log]) => [id, [...log]]));
+}
+loadDemo();
 const todo = (name: string) => () => Promise.reject(new Error(`mockApi.${name} 미구현`));
 
 export const mockApi: Api = {
@@ -56,7 +65,10 @@ export const mockApi: Api = {
 
   deleteCase: async (caseId) => {
     cases = cases.filter((c) => c.id !== caseId);
+    delete logs[caseId];
   },
+
+  listMessages: async (caseId) => logs[caseId] ?? [],
   sendMessage: todo('sendMessage'),
   uploadVideo: todo('uploadVideo'),
   analyze: async function* (): AsyncGenerator<AnalyzeEvent> {
@@ -72,5 +84,8 @@ export const mockApi: Api = {
   updateRebuttal: todo('updateRebuttal'),
   sendRebuttal: todo('sendRebuttal'),
   listHistory: todo('listHistory'),
-  resetDemo: todo('resetDemo'),
+  resetDemo: async () => {
+    loadDemo();
+    nextId = 1;
+  },
 };

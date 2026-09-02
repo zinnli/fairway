@@ -2,6 +2,7 @@ import type { Case, CaseSummary, HistoryEntry, VideoRef } from '@/domain/case';
 import type { Fact, FactKey } from '@/domain/fact';
 import type { Ratio, Verdict } from '@/domain/verdict';
 import type { Rebuttal, SentReceipt, Statement } from '@/domain/document';
+import type { ChatMessage } from '@/domain/message';
 
 /** 분석 진행 이벤트 — 실서버에서는 SSE, 목에서는 타이머 */
 export type AnalyzeEvent =
@@ -21,6 +22,8 @@ export interface Api {
   renameCase(caseId: string, title: string): Promise<void>;
   deleteCase(caseId: string): Promise<void>;
 
+  /** 사건을 열 때 지난 대화를 되살린다. 대화는 추가만 하므로 이게 로그의 시작이다 */
+  listMessages(caseId: string): Promise<ChatMessage[]>;
   sendMessage(caseId: string, text: string): Promise<void>;
   uploadVideo(
     caseId: string,

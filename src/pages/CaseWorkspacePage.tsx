@@ -34,15 +34,17 @@ export function CaseWorkspacePage() {
 
   useEffect(() => {
     let alive = true;
-    api
-      .getCase(caseId)
-      .then((c) => {
+    Promise.all([api.getCase(caseId), api.listMessages(caseId)])
+      .then(([c, past]) => {
         if (!alive) return;
         setLoaded({ id: caseId, item: c });
-        // 접수 안내는 사건을 열 때마다 로그 맨 앞에 깔린다 (h12)
+        /* 지난 대화를 그대로 되살린다. 아직 아무 말도 오가지 않은 사건은
+           접수 안내 한 장으로 시작한다 (h12) */
         dispatch({
           type: 'reset',
-          messages: [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
+          messages: past.length
+            ? past
+            : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
         });
       })
       .catch(() => {
