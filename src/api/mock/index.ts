@@ -79,8 +79,6 @@ function readDuration(url: string): Promise<number> {
   });
 }
 
-const todo = (name: string) => () => Promise.reject(new Error(`mockApi.${name} 미구현`));
-
 export const mockApi: Api = {
   listCases: async () =>
     [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(toSummary),
@@ -128,11 +126,19 @@ export const mockApi: Api = {
   },
 
   deleteCase: async (caseId) => {
+    /* 영상은 사건 안에서만 산다 (규칙 0.4). 사건을 지우면 브라우저가 물고 있던
+       objectUrl도 같이 놓아 준다 */
+    const gone = cases.find((c) => c.id === caseId);
+    if (gone?.video?.objectUrl) URL.revokeObjectURL(gone.video.objectUrl);
     cases = cases.filter((c) => c.id !== caseId);
     delete logs[caseId];
   },
 
   listMessages: async (caseId) => logs[caseId] ?? [],
+
+  appendMessage: async (caseId, body) => {
+    push(caseId, body);
+  },
 
   sendMessage: async (caseId, text) => {
     push(caseId, { role: 'user', kind: 'text', text });
@@ -288,7 +294,12 @@ export const mockApi: Api = {
     return verdict;
   },
 
-  setOpponentClaim: todo('setOpponentClaim'),
+  setOpponentClaim: async (caseId, ratio) => {
+    const found = cases.find((c) => c.id === caseId);
+    if (!found?.verdict) return;
+    found.verdict = { ...found.verdict, opponentClaim: ratio };
+    found.updatedAt = new Date().toISOString();
+  },
 
   createStatement: async (caseId) => {
     await wait(700);
