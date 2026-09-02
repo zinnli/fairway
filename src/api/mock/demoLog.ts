@@ -1,4 +1,4 @@
-import type { ChatMessage } from '@/domain/message';
+import type { ChatMessage, MessageBody } from '@/domain/message';
 import {
   DEMO_REBUTTAL,
   DEMO_STATEMENT,
@@ -15,8 +15,7 @@ import {
  * 문구는 시안(h13·h14·h16·h18·h20·h21·h29)에서 그대로 가져왔다.
  */
 
-/** id·at 없이 알맹이만 적는다. 유니온이라 배분형 Omit이 필요하다 */
-type Body<T = ChatMessage> = T extends unknown ? Omit<T, 'id' | 'at'> : never;
+type Body = MessageBody;
 
 function log(caseId: string, at: string, bodies: Body[]): ChatMessage[] {
   return bodies.map((body, i) => ({ ...body, id: `${caseId}-${i + 1}`, at }) as ChatMessage);
@@ -89,7 +88,6 @@ export const DEMO_LOGS: Record<string, ChatMessage[]> = {
     ...OPENING,
     ...AFTER_FACTS,
     ...VERDICT_STEP,
-    { role: 'ai', kind: 'statementDraft', doc: DEMO_STATEMENT },
     { role: 'user', kind: 'choice', label: '상대 신호를 "황색"으로 고쳤어요', forField: 'opponentSignal' },
     {
       role: 'ai',

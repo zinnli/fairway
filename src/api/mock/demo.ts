@@ -55,8 +55,13 @@ export const FACTS_PENDING: Fact[] = [
   ...FACTS_ANALYZING,
   { key: 'opponentSignal', value: '상대 적색 신호 (위반)', source: 'video', confidence: 0.91 },
   { key: 'mySpeed', value: '약 48km/h', source: 'video', confidence: 0.88 },
-  { key: 'impactPoint', value: '충돌 부위 확인 필요', source: 'unknown' },
-  { key: 'stopLineTiming', value: '정지선 통과 확인 필요', source: 'unknown' },
+  { key: 'impactPoint', value: '충돌 부위 확인 필요', source: 'unknown', note: '영상 각도로는 안 보여요' },
+  {
+    key: 'stopLineTiming',
+    value: '정지선 통과 확인 필요',
+    source: 'unknown',
+    note: '정지선이 화면 밖이에요',
+  },
 ];
 
 /** 질문에 답한 뒤 — 충돌 부위는 내가 말했고, 정지선만 쟁점으로 남았다 (h09·h21) */
@@ -115,24 +120,43 @@ export const DEMO_STATEMENT: Statement = {
     {
       title: '사고 일시 및 장소',
       body: '2026년 8월 22일 14시경, 서울시 강남구 논현사거리 교차로에서 발생한 사고입니다.',
+      sources: [
+        { label: '영상(찍힌 시각)', source: 'video' },
+        { label: '내가 말한 것(사고 장소)', source: 'statement' },
+      ],
     },
     {
       title: '사고 경위',
       body:
         '본인은 2차로에서 정상 신호에 따라 직진 중이었습니다. 우측에서 적색 신호에 교차로에 ' +
         '진입한 이륜차가 본인 차량의 우측 앞펜더를 충격하였습니다.',
+      sources: [
+        { label: '영상(차선·신호)', source: 'video' },
+        { label: '내가 말한 것(충돌 부위)', source: 'statement' },
+      ],
     },
     {
       title: '블랙박스 영상 분석 결과',
       body:
         '영상에서 본인 차량의 2차로 직진, 상대 차량의 적색 신호 진입, 주행 속도 약 48km/h가 ' +
         '확인됩니다.',
+      sources: [
+        { label: '영상(차선·신호·속도)', source: 'video' },
+        { label: '정지선 통과 시점은 확인 필요', source: 'unknown' },
+      ],
     },
     {
       title: '주장 요지',
       body:
         '상대 차량이 적색 신호에 교차로에 들어와 생긴 사고이므로, 상대 차량의 일방과실 적용을 ' +
         '요청드립니다.',
+      sources: [
+        {
+          label:
+            '인정기준 도표(신호기 있는 교차로 · 신호위반) · 심의사례 2019-018856 · 2021-004312',
+          source: 'ref',
+        },
+      ],
     },
   ],
   pageCount: 2,
@@ -225,7 +249,7 @@ const SEEDED: Case[] = [
     id: 'case-0829',
     title: '교차로 직진 충돌 · 08-29',
     status: '재판정중',
-    stages: { analysis: '완료', verdict: '진행중', statement: '완료', rebuttal: '대기' },
+    stages: { analysis: '완료', verdict: '진행중', statement: '대기', rebuttal: '대기' },
     facts: FACTS_AMBER,
     video: DEMO_VIDEO,
     verdict: VERDICT_RED,

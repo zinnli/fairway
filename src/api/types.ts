@@ -37,7 +37,10 @@ export interface Api {
 
   /** 판정에 쓰인 항목이면 재판정된 Verdict를, 아니면 null을 돌려준다 (2.7) */
   patchFact(caseId: string, key: FactKey, value: string): Promise<Verdict | null>;
+  /** 되물음에 답한다. value가 null이면 [확인 필요]로 남는다 */
   answerQuestion(caseId: string, key: FactKey, value: string | null): Promise<void>;
+  /** 사실이 다 모였을 때 판정을 청한다 */
+  judge(caseId: string): Promise<Verdict>;
   setOpponentClaim(caseId: string, ratio: Ratio): Promise<void>;
 
   createStatement(caseId: string): Promise<Statement>;
