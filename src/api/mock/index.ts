@@ -41,7 +41,11 @@ const newCaseId = () =>
 
 function loadDemo() {
   cases = DEMO_CASES.map((c) => ({ ...c }));
-  logs = Object.fromEntries(Object.entries(DEMO_LOGS).map(([id, log]) => [id, [...log]]));
+  logs = Object.fromEntries(
+    Object.entries(DEMO_LOGS)
+      .filter(([id]) => cases.some((c) => c.id === id))
+      .map(([id, log]) => [id, [...log]]),
+  );
 }
 loadDemo();
 /** 빈 사건 = 영상도 없고 내가 보낸 말도 하나 없는 사건.
@@ -212,8 +216,11 @@ export const mockApi: Api = {
       found.stages = { ...found.stages, analysis: '완료' };
       found.status = '확인 필요';
       /* 제목은 분석이 끝나면 AI가 붙인다 (기능명세 1.1).
-         목이라 시연 사고 하나만 알고 있다 — 서버가 붙으면 진짜 이름이 온다 */
-      found.title ??= '교차로 직진 충돌 · 08-22';
+         목이라 사고 유형은 하나만 안다 — 날짜는 접수일에서 가져와 어긋나지 않게 한다.
+         서버가 붙으면 진짜 이름이 온다 */
+      const at = new Date(found.createdAt);
+      const mmdd = `${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+      found.title ??= `교차로 직진 충돌 · ${mmdd}`;
       found.updatedAt = new Date().toISOString();
       push(caseId, { role: 'ai', kind: 'facts', facts: FACTS_PENDING });
     }
