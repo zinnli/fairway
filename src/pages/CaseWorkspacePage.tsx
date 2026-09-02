@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router';
+import { useLocation, useNavigate, useParams } from 'react-router';
 import { api } from '@/api';
 import { toApiError } from '@/api/error';
 import { Drawer } from '@/components/ui/Drawer';
@@ -49,26 +49,29 @@ export function CaseWorkspacePage() {
      이전 사건의 화면이 잠깐 비치거나 "없는 사건" 문구가 스치는 걸 막는다 */
   const [loaded, setLoaded] = useState<{ id: string; item: Case | null } | null>(null);
   const [chat, dispatch] = useReducer(chatReducer, emptyChat);
-  /* 어느 사건에서 연 서랍인지까지 들고 있는다. 사건이 바뀌면 저절로 닫힌 셈이 되어
-     effect로 닫을 필요가 없다 */
+  /* 어느 화면에서 연 것인지까지 들고 있는다. 주소가 바뀌면 저절로 닫힌 셈이라
+     effect로 닫을 필요가 없다.
+     사건 id가 아니라 location.key로 묶는다 — [새 사건]이 빈 사건을 다시 쓰면
+     같은 사건으로 다시 들어오는데, 그때도 열려 있던 서랍은 닫혀야 한다 */
+  const { key: viewKey } = useLocation();
   const [drawer, setDrawer] = useState<{
-    id: string;
+    key: string;
     which: 'cases' | 'status' | 'statement' | 'rebuttal';
   } | null>(null);
-  const openDrawer = drawer?.id === caseId ? drawer.which : null;
-  /* 팝업 4종. 사건이 바뀌면 같이 닫히도록 사건 id를 함께 들고 있는다 */
+  const openDrawer = drawer?.key === viewKey ? drawer.which : null;
+  /* 팝업 4종도 같은 규칙을 쓴다 */
   const [rewriting, setRewriting] = useState(false);
   const [sending, setSending] = useState(false);
   const [popup, setPopup] = useState<{
-    id: string;
+    key: string;
     which: 'chart' | 'precedent' | 'history' | 'process';
     precedent?: Precedent;
   } | null>(null);
-  const openPopup = popup?.id === caseId ? popup.which : null;
+  const openPopup = popup?.key === viewKey ? popup.which : null;
   const show = (which: 'cases' | 'status' | 'statement' | 'rebuttal') =>
-    setDrawer({ id: caseId, which });
+    setDrawer({ key: viewKey, which });
   const pop = (which: 'chart' | 'precedent' | 'history' | 'process', precedent?: Precedent) =>
-    setPopup({ id: caseId, which, precedent });
+    setPopup({ key: viewKey, which, precedent });
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pickVideo = () => fileRef.current?.click();
@@ -346,8 +349,8 @@ export function CaseWorkspacePage() {
     });
     await refresh();
     /* 만들자마자 보내기 창을 연다 — 만들기만 하고 끝내면 다음 수가 안 보인다 */
-    setDrawer({ id: caseId, which: 'rebuttal' });
-  }, [caseId, refresh]);
+    setDrawer({ key: viewKey, which: 'rebuttal' });
+  }, [caseId, refresh, viewKey]);
 
   const rewriteStatement = useCallback(
     async (note: string) => {
@@ -678,7 +681,7 @@ export function CaseWorkspacePage() {
       <ProcessDialog open={openPopup === 'process'} onClose={() => setPopup(null)} />
 
       <Drawer
-        open={true /*TMP*/}
+        open={openDrawer === 'status'}
         onClose={() => setDrawer(null)}
         side="sheet"
         label="사건 현황판"
