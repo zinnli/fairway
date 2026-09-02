@@ -77,6 +77,14 @@
     -webkit-font-smoothing: antialiased;
   }
 
+  /* Tailwind 4 초기화가 button을 cursor:default로 되돌린다.
+     누를 수 있는 것은 손가락 커서로 보여 준다. 잠긴 것은 그대로 둔다 */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary {
+    cursor: pointer;
+  }
+
   /* 초점 정본 — outline 2px brand, offset 2px (00 문서 3-1) */
   :focus-visible {
     outline: 2px solid var(--color-brand);
