@@ -17,10 +17,11 @@ export function ChatHeader({ item }: { item: Case }) {
   return (
     <header className="-mb-3 flex w-full flex-col gap-2">
       <div className="flex items-center gap-2">
-        <span className="flex shrink-0 text-brand" aria-hidden>
+        {/* 방패는 모바일 16 · PC 20 (m05 / h12). Icon은 크기를 속성으로 받으므로 CSS로 덮는다 */}
+        <span className="flex shrink-0 text-brand max-md:[&_svg]:h-4 max-md:[&_svg]:w-4" aria-hidden>
           <Icon name="shield" size={20} />
         </span>
-        <h1 className="min-w-0 truncate text-[20px] font-bold text-ink">
+        <h1 className="min-w-0 truncate text-[17px] font-bold text-ink md:text-[20px]">
           {item.title ?? '새 사건'}
         </h1>
       </div>
