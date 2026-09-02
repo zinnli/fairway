@@ -31,6 +31,11 @@ function loadDemo() {
   logs = Object.fromEntries(Object.entries(DEMO_LOGS).map(([id, log]) => [id, [...log]]));
 }
 loadDemo();
+/** 빈 사건 = 영상도 없고 내가 보낸 말도 하나 없는 사건.
+ *  ★ sendMessage·uploadVideo를 붙일 때 logs에도 같이 쌓아야 이 판정이 계속 맞는다 */
+const isBlank = (c: Case) =>
+  c.video === null && !(logs[c.id] ?? []).some((m) => m.role === 'user');
+
 const todo = (name: string) => () => Promise.reject(new Error(`mockApi.${name} 미구현`));
 
 export const mockApi: Api = {
@@ -44,6 +49,12 @@ export const mockApi: Api = {
   },
 
   createCase: async () => {
+    /* [새 사건]을 연달아 눌러도 빈 사건이 쌓이지 않게, 이미 있으면 그것을 다시 쓴다.
+       기능명세 1.1은 "누르면 3초 안에 채팅이 열린다"고만 하지 매번 새로 만들라고 하지 않는다.
+       버튼을 잠그지 않는 이유도 같다 — 잠그면 그 확인 문장이 깨진다 */
+    const blank = cases.find(isBlank);
+    if (blank) return blank;
+
     const now = new Date().toISOString();
     const created: Case = {
       id: newCaseId(),
