@@ -11,14 +11,16 @@ import {
   PrecedentDialog,
   ProcessDialog,
 } from '@/features/workspace/dialogs/GroundDialogs';
+import { ErrorDialog, SendConfirmDialog } from '@/features/workspace/dialogs/AlertDialogs';
+import { VideoDialog } from '@/features/workspace/dialogs/VideoDialog';
 import { VIDEO_LIMITS } from '@/config';
 import { ANALYZE_STEPS } from '@/domain/analysis';
 import { FACT_LABEL, type Fact, type FactKey } from '@/domain/fact';
 import { FACT_QUESTIONS } from '@/domain/questions';
-import type { Rebuttal } from '@/domain/document';
-import type { ChatMessage, Chip } from '@/domain/message';
-import type { Precedent } from '@/domain/verdict';
-import type { Case } from '@/domain/case';
+import type { Rebuttal, Statement } from '@/domain/document';
+import type { ChatMessage, Chip, MessageBody } from '@/domain/message';
+import type { Precedent, Ratio } from '@/domain/verdict';
+import type { Case, VideoRef } from '@/domain/case';
 import { Sidebar } from '@/features/cases/Sidebar';
 import { ChatHeader } from '@/features/workspace/ChatHeader';
 import { Composer } from '@/features/workspace/Composer';
@@ -62,6 +64,14 @@ export function CaseWorkspacePage() {
   /* 팝업 4종도 같은 규칙을 쓴다 */
   const [rewriting, setRewriting] = useState(false);
   const [sending, setSending] = useState(false);
+  /* 보내기 직전 한 번 더 묻는다 (h35) */
+  const [confirmSend, setConfirmSend] = useState<Rebuttal | null>(null);
+  /* P-5 오류 공용 틀 — PDF 실패(h32) · 발송 실패(h36) */
+  const [failure, setFailure] = useState<{ title: string; hint: string; retry: () => void } | null>(
+    null,
+  );
+  /* F01 영상 뷰어 */
+  const [playing, setPlaying] = useState<VideoRef | null>(null);
   const [popup, setPopup] = useState<{
     key: string;
     which: 'chart' | 'precedent' | 'history' | 'process';
@@ -88,6 +98,8 @@ export function CaseWorkspacePage() {
   const itemRef = useRef<Case | null>(null);
   /* 보기 없이 되물은 항목 — 다음에 치는 글이 그 항목의 답이 된다 */
   const pendingFact = useRef<FactKey | null>(null);
+  /* 콜백 안에서 지금 서류가 있는지 봐야 한다 */
+  const statementRef = useRef<Statement | null>(null);
   /* 지금 보고 있는 사건. 업로드·분석이 도는 동안 사건을 바꾸면
      끝난 결과가 남의 대화에 붙는다 — 그걸 막는 문지기다 */
   const activeCase = useRef(caseId);
@@ -98,6 +110,16 @@ export function CaseWorkspacePage() {
     setLoaded({ id: caseId, item: fresh });
     void reloadList();
   }, [caseId, reloadList]);
+
+  /* 화면이 만든 카드를 대화에도 쌓고 로그에도 남긴다.
+     지나가는 카드(업로드 중·분석 중·오류)는 keep을 끄고 화면에만 둔다 */
+  const say = useCallback(
+    (body: MessageBody, keep = true) => {
+      dispatch({ type: 'append', message: { ...body, id: nextId(), at: now() } as ChatMessage });
+      if (keep) void api.appendMessage(caseId, body);
+    },
+    [caseId],
+  );
 
   const startAnalyze = useCallback(async () => {
     if (analyzing.current) return;
@@ -194,15 +216,10 @@ export function CaseWorkspacePage() {
         if (messagesRef.current.some((m) => m.role === 'user' && m.kind === 'text')) {
           void startAnalyze();
         } else {
-          dispatch({
-            type: 'append',
-            message: {
-              id: nextId(),
-              at: now(),
-              role: 'ai',
-              kind: 'text',
-              text: '영상 잘 받았어요. 사고 상황을 한두 줄만 알려 주시면 바로 분석을 시작할게요.',
-            },
+          say({
+            role: 'ai',
+            kind: 'text',
+            text: '영상 잘 받았어요. 사고 상황을 한두 줄만 알려 주시면 바로 분석을 시작할게요.',
           });
         }
       } catch (e) {
@@ -233,7 +250,7 @@ export function CaseWorkspacePage() {
         uploadAbort.current = null;
       }
     },
-    [caseId, refresh, startAnalyze],
+    [caseId, refresh, say, startAnalyze],
   );
 
   /* 멈추면 그대로 두지 않고 왜 멈췄는지와 다음 수를 남긴다 (규칙 0.7) */
@@ -261,30 +278,28 @@ export function CaseWorkspacePage() {
   }, []);
 
   /* 아직 확인 안 된 항목을 하나 골라 되묻는다. 보기가 없는 항목은 글로 답하게 둔다 */
-  const ask = useCallback((fact: Fact) => {
-    const question = FACT_QUESTIONS[fact.key];
-    pendingFact.current = question ? null : fact.key;
-    dispatch({
-      type: 'append',
-      message: question
-        ? {
-            id: nextId(),
-            at: now(),
-            role: 'ai',
-            kind: 'question',
-            field: fact.key,
-            text: question.text,
-            chips: question.chips,
-          }
-        : {
-            id: nextId(),
-            at: now(),
-            role: 'ai',
-            kind: 'text',
-            text: `${FACT_LABEL[fact.key]}${particle(FACT_LABEL[fact.key], '은', '는')} 어떻게 되나요? 편하게 적어 주세요.`,
-          },
-    });
-  }, []);
+  const ask = useCallback(
+    (fact: Fact) => {
+      const question = FACT_QUESTIONS[fact.key];
+      pendingFact.current = question ? null : fact.key;
+      say(
+        question
+          ? {
+              role: 'ai',
+              kind: 'question',
+              field: fact.key,
+              text: question.text,
+              chips: question.chips,
+            }
+          : {
+              role: 'ai',
+              kind: 'text',
+              text: `${FACT_LABEL[fact.key]}${particle(FACT_LABEL[fact.key], '은', '는')} 어떻게 되나요? 편하게 적어 주세요.`,
+            },
+      );
+    },
+    [say],
+  );
 
   /* 남은 게 있으면 이어서 묻고, 다 모였으면 판정을 청한다 */
   const askNextOrJudge = useCallback(async () => {
@@ -292,6 +307,12 @@ export function CaseWorkspacePage() {
     const rest = fresh.facts.find((f) => f.source === 'unknown' && !f.isDisputed);
     if (rest) {
       ask(rest);
+      await refresh();
+      return;
+    }
+    /* 이미 판정이 있으면 다시 만들지 않는다. 판정을 뒤집는 건 patchFact가 재판정을
+       돌려줄 때뿐이다 — 그러지 않으면 사실을 고칠 때마다 같은 판정 카드가 쌓인다 */
+    if (fresh.verdict) {
       await refresh();
       return;
     }
@@ -313,33 +334,80 @@ export function CaseWorkspacePage() {
 
   const answerQuestion = useCallback(
     async (field: FactKey, chip: Chip) => {
-      dispatch({
-        type: 'append',
-        message: { id: nextId(), at: now(), role: 'user', kind: 'choice', label: chip.label, forField: field },
-      });
+      say({ role: 'user', kind: 'choice', label: chip.label, forField: field });
       await api.answerQuestion(caseId, field, chip.isUnknown ? null : chip.value);
       await askNextOrJudge();
     },
-    [askNextOrJudge, caseId],
+    [askNextOrJudge, caseId, say],
   );
 
-  /* 사실 카드의 [고칠래요]·[알려주기] — 같은 되묻기로 이어진다 */
-  const askAboutFact = useCallback(
-    (key: FactKey) => {
-      const fact = itemRef.current?.facts.find((f) => f.key === key);
-      if (fact) ask(fact);
+  /* 사실 카드에서 고친 값을 확정한다 (h19).
+     판정에 쓰인 항목이면 patchFact가 재판정을 돌려주고, 그러면 h24 → h25로 이어진다 */
+  const fixFact = useCallback(
+    async (key: FactKey, value: string | null) => {
+      if (value === null) {
+        await api.answerQuestion(caseId, key, null);
+        await refresh();
+        return;
+      }
+      const before = itemRef.current?.verdict?.ratio ?? null;
+      const rejudged = await api.patchFact(caseId, key, value);
+      if (rejudged && before) {
+        say(
+          {
+            role: 'ai',
+            kind: 'rejudging',
+            from: before,
+            reason: '판정에 쓰인 정보라서 과실비율을 다시 따지고 있어요…',
+          },
+          false,
+        );
+        await refresh();
+        await new Promise((r) => setTimeout(r, 1400));
+        say({ role: 'ai', kind: 'verdict', verdict: rejudged, previous: before }, false);
+      }
+      await refresh();
     },
-    [ask],
+    [caseId, refresh, say],
   );
+
+  /* 상대 주장을 받으면 그 판정 카드를 그 자리에서 비교표가 있는 모습으로 바꾼다 (h22) */
+  const setClaim = useCallback(
+    async (messageId: string, ratio: Ratio) => {
+      await api.setOpponentClaim(caseId, ratio);
+      const fresh = await api.getCase(caseId);
+      if (fresh.verdict) {
+        dispatch({
+          type: 'settle',
+          message: { id: messageId, at: now(), role: 'ai', kind: 'verdict', verdict: fresh.verdict },
+        });
+      }
+      await refresh();
+    },
+    [caseId, refresh],
+  );
+
+  /* 현황판 [고치기] — 대화에 사실 카드를 한 장 더 붙인다. 대화는 추가만 한다 */
+  const editFacts = useCallback(() => {
+    const facts = itemRef.current?.facts ?? [];
+    if (facts.length === 0) return;
+    setDrawer(null);
+    say({ role: 'ai', kind: 'facts', facts });
+  }, [say]);
 
   const createStatement = useCallback(async () => {
+    /* 판정 카드와 현황판 두 곳에서 부른다. 이미 있으면 새로 만들지 않고 연다 */
+    if (statementRef.current) {
+      setDrawer({ key: viewKey, which: 'statement' });
+      return;
+    }
     const doc = await api.createStatement(caseId);
     dispatch({
       type: 'append',
       message: { id: nextId(), at: now(), role: 'ai', kind: 'statementDraft', doc },
     });
     await refresh();
-  }, [caseId, refresh]);
+  }, [caseId, refresh, viewKey]);
 
   const createRebuttal = useCallback(async () => {
     const doc = await api.createRebuttal(caseId);
@@ -374,22 +442,44 @@ export function CaseWorkspacePage() {
       setSending(true);
       try {
         const receipt = await api.sendRebuttal(caseId, draft);
+        setConfirmSend(null);
         setDrawer(null);
-        dispatch({
-          type: 'append',
-          message: { id: nextId(), at: receipt.at, role: 'ai', kind: 'sent', to: receipt.to },
-        });
-        dispatch({
-          type: 'append',
-          message: { id: nextId(), at: now(), role: 'ai', kind: 'nextSteps' },
-        });
+        say({ role: 'ai', kind: 'sent', to: receipt.to }, false);
+        say({ role: 'ai', kind: 'nextSteps' }, false);
         await refresh();
+      } catch {
+        /* 작성한 내용과 첨부는 그대로 둔다 (h36) */
+        setFailure({
+          title: '보내지 못했어요',
+          hint: '메일 서버가 응답하지 않았어요. 작성한 내용과 첨부는 그대로 있으니, 잠시 후 다시 시도해 주세요.',
+          /* 쓴 내용은 그대로 두고 확인 창으로 돌려보낸다 (h36) */
+          retry: () => {
+            setFailure(null);
+            setConfirmSend(draft);
+          },
+        });
       } finally {
         setSending(false);
       }
     },
-    [caseId, refresh],
+    [caseId, refresh, say],
   );
+
+  /* 인쇄가 막히면(팝업 차단 등) 그냥 넘기지 않고 이유를 말한다 (h32) */
+  const printStatement = useCallback(() => {
+    try {
+      window.print();
+    } catch {
+      setFailure({
+        title: 'PDF를 만들지 못했어요',
+        hint: '일시적인 오류예요. 잠시 후 다시 시도하면 대부분 해결돼요. 계속 안 되면 화면을 새로고침해 주세요.',
+        retry: () => {
+          setFailure(null);
+          window.print();
+        },
+      });
+    }
+  }, []);
 
   const sendText = useCallback(
     async (text: string) => {
@@ -515,9 +605,12 @@ export function CaseWorkspacePage() {
       .find((m) => m.kind === 'verdict' || m.kind === 'statementDraft')?.id ?? null;
   /* 아직 확인 안 된 항목이 있으면 서류에서 단정해 쓰지 않았다고 말해 준다 (h26·h30) */
   const unknownFact = item?.facts.find((f) => f.source === 'unknown') ?? null;
-  const unknownNote = unknownFact
-    ? `${FACT_LABEL[unknownFact.key]}${particle(FACT_LABEL[unknownFact.key], '은', '는')} 아직 확인되지 않았어요. 이 한 가지는 본문에 단정해서 쓰지 않았어요.`
+  const unknownLead = unknownFact
+    ? `${FACT_LABEL[unknownFact.key]}${particle(FACT_LABEL[unknownFact.key], '은', '는')} 아직 확인되지 않았어요.`
     : null;
+  /* 같은 사실을 서류(h30)와 발송(h34)에서 다르게 안내한다. 문장을 잘라 쓰지 않는다 */
+  const unknownNote = unknownLead && `${unknownLead} 이 한 가지는 본문에 단정해서 쓰지 않았어요.`;
+  const unknownSendNote = unknownLead && `${unknownLead} 이대로 보내도 괜찮을까요?`;
 
   useEffect(() => {
     messagesRef.current = chat.messages;
@@ -526,6 +619,10 @@ export function CaseWorkspacePage() {
   useEffect(() => {
     itemRef.current = item;
   }, [item]);
+
+  useEffect(() => {
+    statementRef.current = statement;
+  }, [statement]);
 
   const notFound = loaded?.id === caseId && loaded.item === null;
 
@@ -599,17 +696,19 @@ export function CaseWorkspacePage() {
                   onCancelUpload: () => uploadAbort.current?.abort(),
                   onStopAnalyze: stopAnalyze,
                   onRetryAnalyze: () => void startAnalyze(),
-                  onFixFact: askAboutFact,
+                  onFixFact: (key, value) => void fixFact(key, value),
                   onConfirmFacts: confirmFacts,
                   onAnswerQuestion: answerQuestion,
                   onOpenChart: () => pop('chart'),
                   onOpenPrecedent: (p) => pop('precedent', p),
                   onCreateStatement: () => void createStatement(),
+                  onOpponentClaim: (ratio) => void setClaim(message.id, ratio),
                   onOpenStatement: () => show('statement'),
-                  onPrintStatement: () => window.print(),
+                  onPrintStatement: printStatement,
                   onCreateRebuttal: () => void createRebuttal(),
                   onOpenRebuttal: () => show('rebuttal'),
                   onOpenProcess: () => pop('process'),
+                  onOpenVideo: setPlaying,
                   unknownNote,
                 }}
               />
@@ -632,6 +731,7 @@ export function CaseWorkspacePage() {
             onOpenStatement={() => (statement ? show('statement') : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
             onOpenHistory={() => pop('history')}
+            onEditFacts={editFacts}
           />
         </div>
       )}
@@ -652,19 +752,17 @@ export function CaseWorkspacePage() {
         rewriting={rewriting}
         onClose={() => setDrawer(null)}
         onRewrite={(note) => void rewriteStatement(note)}
-        onPrint={() => window.print()}
+        onPrint={printStatement}
       />
 
       <RebuttalDialog
         open={openDrawer === 'rebuttal'}
         doc={rebuttal}
         claimNo={item?.claimNo ?? null}
-        unknownNote={
-          unknownFact ? `${unknownNote?.split('.')[0]}. 이대로 보내도 괜찮을까요?` : null
-        }
+        unknownNote={unknownSendNote}
         sending={sending}
         onClose={() => setDrawer(null)}
-        onSend={(draft) => void sendRebuttal(draft)}
+        onSend={(draft) => setConfirmSend(draft)}
       />
 
       <ChartDialog open={openPopup === 'chart'} verdict={verdict} onClose={() => setPopup(null)} />
@@ -679,6 +777,25 @@ export function CaseWorkspacePage() {
         onClose={() => setPopup(null)}
       />
       <ProcessDialog open={openPopup === 'process'} onClose={() => setPopup(null)} />
+
+      <SendConfirmDialog
+        open={confirmSend !== null}
+        draft={confirmSend}
+        unknownNote={unknownLead}
+        sending={sending}
+        onBack={() => setConfirmSend(null)}
+        onSend={() => confirmSend && void sendRebuttal(confirmSend)}
+      />
+
+      <VideoDialog open={playing !== null} video={playing} onClose={() => setPlaying(null)} />
+
+      <ErrorDialog
+        open={failure !== null}
+        title={failure?.title ?? ''}
+        hint={failure?.hint ?? ''}
+        onClose={() => setFailure(null)}
+        onRetry={() => failure?.retry()}
+      />
 
       <Drawer
         open={openDrawer === 'status'}
@@ -695,6 +812,7 @@ export function CaseWorkspacePage() {
             onOpenStatement={() => (statement ? show('statement') : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
             onOpenHistory={() => pop('history')}
+            onEditFacts={editFacts}
           />
         )}
       </Drawer>

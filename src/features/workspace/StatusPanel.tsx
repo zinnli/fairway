@@ -90,6 +90,7 @@ export function StatusPanel({
   statement,
   rebuttal,
   showDisclaimer,
+  onEditFacts,
   onOpenStatement,
   onOpenRebuttal,
   onOpenHistory,
@@ -103,6 +104,8 @@ export function StatusPanel({
   onOpenStatement: () => void;
   onOpenRebuttal: () => void;
   onOpenHistory: () => void;
+  /** 확인된 사실 옆 [고치기] — 대화에 사실 카드를 한 장 더 붙인다 (h23) */
+  onEditFacts: () => void;
 }) {
   const ratio = item.verdict?.ratio ?? null;
 
@@ -170,9 +173,20 @@ export function StatusPanel({
         </div>
 
         <div className="flex flex-col gap-2">
-          <SectionTitle icon="checkCircle">
-            {item.facts.length > 0 ? factCountLabel(item.facts) : '확인된 사실'}
-          </SectionTitle>
+          <div className="flex items-center gap-2">
+            <SectionTitle icon="checkCircle">
+              {item.facts.length > 0 ? factCountLabel(item.facts) : '확인된 사실'}
+            </SectionTitle>
+            {item.facts.length > 0 && (
+              <button
+                type="button"
+                onClick={onEditFacts}
+                className="-my-1 ml-auto flex min-h-11 shrink-0 items-center rounded-sm px-2 text-[12.5px] font-medium text-brand-press hover:bg-bg-2 sm:min-h-8"
+              >
+                고치기
+              </button>
+            )}
+          </div>
           {item.facts.length === 0 ? (
             <p className="text-[13.5px] text-muted">영상을 올리면 여기에 쌓여요.</p>
           ) : (
