@@ -7,9 +7,10 @@ import { CasesPage } from '@/pages/CasesPage';
 import { CaseWorkspacePage } from '@/pages/CaseWorkspacePage';
 
 /**
- * 라우트는 6개뿐이다 (docs/frontend-plan.md 5절).
+ * 라우트는 5개뿐이다 (docs/frontend-plan.md 5절).
  * /cases/:caseId 하나가 h12~h39 + f01~f04 + m05~m13을 전부 흡수한다.
- * S5(경위서 전문)·S6(반박의견서)는 라우트가 아니라 검색 파라미터로 여는 서랍이다.
+ * 온보딩은 사건이 0개일 때 뜨는 모달이라 길을 따로 내지 않는다.
+ * S5(경위서 전문)·S6(반박의견서)도 라우트가 아니라 모달이다.
  *
  * MSW 대기·전역 ErrorBoundary·인증 가드가 붙는 시점에 Router를 이 파일에서 떼어낸다.
  */
