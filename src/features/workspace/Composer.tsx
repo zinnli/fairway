@@ -30,7 +30,7 @@ export function Composer({
   };
 
   return (
-    <div className="flex flex-none px-6 pt-3 pb-4">
+    <div className="flex flex-none px-4 pt-3 pb-4 md:px-6">
       <form
         className="flex h-13 min-w-0 flex-1 items-center gap-2 rounded-full border border-line-2 bg-surface px-2 shadow-[0_4px_12px_rgba(17,20,26,0.06)]"
         onSubmit={(e) => {
