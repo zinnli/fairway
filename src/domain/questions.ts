@@ -31,3 +31,19 @@ export const FACT_QUESTIONS: Partial<Record<FactKey, FactQuestion>> = {
     ],
   },
 };
+
+/**
+ * 사실을 고칠 때 내미는 보기 — h19.
+ * 시안이 보여 주는 건 상대 신호 하나뿐이라 그것만 적고, 나머지는 되물음 보기를 그대로 쓴다.
+ * 보기가 없는 항목은 글로 적게 둔다.
+ */
+export const FACT_CHOICES: Partial<Record<FactKey, Chip[]>> = {
+  opponentSignal: [
+    { label: '적색', value: '상대 적색 신호 (위반)' },
+    { label: '황색', value: '상대 황색 신호' },
+    { label: '녹색', value: '상대 녹색 신호' },
+    { label: '잘 모르겠어요', value: '', isUnknown: true },
+  ],
+  impactPoint: FACT_QUESTIONS.impactPoint?.chips ?? [],
+  stopLineTiming: FACT_QUESTIONS.stopLineTiming?.chips ?? [],
+};

@@ -10,8 +10,8 @@ import { cn } from '@/lib/cn';
 const CHIP =
   'box-border flex w-70 max-w-full min-w-0 flex-col self-end rounded-lg rounded-br-xs px-4 py-2 md:w-90';
 
-/** 업로드가 끝난 영상 (h16) */
-export function VideoBubble({ video }: { video: VideoRef }) {
+/** 업로드가 끝난 영상 (h16). 누르면 영상 뷰어가 열린다 (F01) */
+export function VideoBubble({ video, onOpen }: { video: VideoRef; onOpen: () => void }) {
   const meta = [
     video.durationSec > 0 ? durationLabel(video.durationSec) : null,
     mb(video.sizeBytes),
@@ -21,10 +21,10 @@ export function VideoBubble({ video }: { video: VideoRef }) {
     .join(' · ');
 
   return (
-    <div className={cn(CHIP, 'gap-1 bg-brand-tint')}>
-      <p className="truncate text-[13.5px] font-semibold text-ink">{video.name}</p>
-      <p className="text-[12.5px] text-muted">{meta}</p>
-    </div>
+    <button type="button" onClick={onOpen} className={cn(CHIP, 'gap-1 bg-brand-tint text-left')}>
+      <span className="w-full truncate text-[13.5px] font-semibold text-ink">{video.name}</span>
+      <span className="text-[12.5px] text-muted">{meta}</span>
+    </button>
   );
 }
 

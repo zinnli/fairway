@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { RatioBar } from '@/components/ui/RatioBar';
@@ -19,6 +20,7 @@ export function VerdictCard({
   onOpenChart,
   onOpenPrecedent,
   onCreateStatement,
+  onOpponentClaim,
   withDisclaimer,
 }: {
   verdict: Verdict;
@@ -26,6 +28,8 @@ export function VerdictCard({
   onOpenChart: () => void;
   onOpenPrecedent: (precedent: Precedent) => void;
   onCreateStatement: () => void;
+  /** 상대 보험사 주장을 받아 나란히 비교한다 (h22). 선택 입력이라 건너뛸 수 있다 */
+  onOpponentClaim: (ratio: Ratio) => void;
   withDisclaimer?: boolean;
 }) {
   const { ratio, opponentClaim } = verdict;
@@ -121,6 +125,8 @@ export function VerdictCard({
         ))}
       </div>
 
+      {!opponentClaim && <OpponentClaimForm onSubmit={onOpponentClaim} />}
+
       <Button size="lg" className="mt-1 self-start" onClick={onCreateStatement}>
         사건경위서 만들기
         <span aria-hidden>→</span>
@@ -151,5 +157,88 @@ function GroundRow({ children, onOpen }: { children: React.ReactNode; onOpen: ()
         <Icon name="chevronRight" size={14} />
       </span>
     </button>
+  );
+}
+
+/**
+ * 상대 보험사 주장 입력 — h22. 선택 입력이고, 두 칸이 다 차야 [비교하기]가 열린다.
+ * 한쪽만 적으면 나머지는 100에서 빼서 자동으로 채운다.
+ */
+function OpponentClaimForm({ onSubmit }: { onSubmit: (ratio: Ratio) => void }) {
+  const [mine, setMine] = useState('');
+  const [opponent, setOpponent] = useState('');
+  const [skipped, setSkipped] = useState(false);
+
+  if (skipped) return null;
+
+  const num = (v: string) => (v.trim() === '' ? null : Number(v));
+  const m = num(mine);
+  const o = num(opponent);
+  const ok = m !== null && o !== null && m >= 0 && o >= 0 && m + o === 100;
+
+  /* 한쪽을 적으면 반대쪽을 채워 준다 */
+  const fill = (which: 'mine' | 'opponent', value: string) => {
+    const n = Number(value);
+    const valid = value.trim() !== '' && Number.isFinite(n) && n >= 0 && n <= 100;
+    if (which === 'mine') {
+      setMine(value);
+      if (valid) setOpponent(String(100 - n));
+    } else {
+      setOpponent(value);
+      if (valid) setMine(String(100 - n));
+    }
+  };
+
+  const cell =
+    'tnum box-border h-11 w-16 rounded-md border border-line bg-surface px-3 text-center text-[15px] text-ink focus-visible:border-brand';
+
+  return (
+    <div className="flex flex-col gap-3 rounded-md border border-line-2 bg-bg-3 p-4">
+      <p className="text-[13.5px] leading-[1.6] text-ink-3">
+        상대 보험사가 말한 비율이 있나요? 있으면 우리 판정과 나란히 비교해 드릴게요. 건너뛰어도
+        돼요.
+      </p>
+      <form
+        className="flex flex-wrap items-center gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (ok) onSubmit({ mine: m, opponent: o });
+        }}
+      >
+        <label className="flex items-center gap-1 text-[13.5px] text-muted">
+          나
+          <input
+            inputMode="numeric"
+            aria-label="상대 보험사가 말한 내 과실"
+            value={mine}
+            onChange={(e) => fill('mine', e.target.value)}
+            className={cell}
+          />
+        </label>
+        <span className="text-muted" aria-hidden>
+          :
+        </span>
+        <label className="flex items-center gap-1 text-[13.5px] text-muted">
+          상대
+          <input
+            inputMode="numeric"
+            aria-label="상대 보험사가 말한 상대 과실"
+            value={opponent}
+            onChange={(e) => fill('opponent', e.target.value)}
+            className={cell}
+          />
+        </label>
+        <Button type="submit" size="sm" disabled={!ok}>
+          비교하기
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => setSkipped(true)}>
+          없어요 · 건너뛸게요
+        </Button>
+      </form>
+      <p className="text-[12.5px] leading-[1.5] text-muted">
+        합이 100이 되게 적어 주세요. 한쪽만 적으면 나머지는 자동으로 채워져요. 두 칸이 다 차면
+        [비교하기]가 열려요.
+      </p>
+    </div>
   );
 }

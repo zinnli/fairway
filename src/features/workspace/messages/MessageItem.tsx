@@ -1,6 +1,7 @@
+import type { VideoRef } from '@/domain/case';
 import type { FactKey } from '@/domain/fact';
 import type { Chip, ChatMessage } from '@/domain/message';
-import type { Precedent } from '@/domain/verdict';
+import type { Precedent, Ratio } from '@/domain/verdict';
 import { AiMessage, AiText } from './AiMessage';
 import { AnalyzingCard } from './AnalyzingCard';
 import { UploadingCard, VideoBubble } from './Attachment';
@@ -22,17 +23,19 @@ export interface MessageActions {
   onCancelUpload: () => void;
   onStopAnalyze: () => void;
   onRetryAnalyze: () => void;
-  onFixFact: (key: FactKey) => void;
+  onFixFact: (key: FactKey, value: string | null) => void;
   onConfirmFacts: () => void;
   onAnswerQuestion: (field: FactKey, chip: Chip) => void;
   onOpenChart: () => void;
   onOpenPrecedent: (precedent: Precedent) => void;
   onCreateStatement: () => void;
+  onOpponentClaim: (ratio: Ratio) => void;
   onOpenStatement: () => void;
   onPrintStatement: () => void;
   onCreateRebuttal: () => void;
   onOpenRebuttal: () => void;
   onOpenProcess: () => void;
+  onOpenVideo: (video: VideoRef) => void;
   /** 아직 확인되지 않은 항목 안내 — 경위서 카드가 쓴다 */
   unknownNote: string | null;
 }
@@ -65,7 +68,7 @@ export function MessageItem({
       return <UserBubble>{message.label}</UserBubble>;
 
     case 'video':
-      return <VideoBubble video={message.video} />;
+      return <VideoBubble video={message.video} onOpen={() => actions.onOpenVideo(message.video)} />;
 
     case 'uploading':
       return (
@@ -114,6 +117,7 @@ export function MessageItem({
           onOpenChart={actions.onOpenChart}
           onOpenPrecedent={actions.onOpenPrecedent}
           onCreateStatement={actions.onCreateStatement}
+          onOpponentClaim={actions.onOpponentClaim}
           withDisclaimer={withDisclaimer}
         />
       );
