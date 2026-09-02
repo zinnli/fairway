@@ -4,7 +4,7 @@ import type { Case } from '@/domain/case';
 
 /**
  * 대화 열 맨 위 — h12·h14·h21 등 작업 화면 전부가 공유한다.
- * 대화와 같이 스크롤된다(시안에서 .chat-scroll 안에 들어 있다).
+ * 스크롤 상자 밖에 붙어 있어서 대화를 내려도 어느 사건인지 계속 보인다.
  *
  * 제목은 분석 전까지 null이라 "새 사건"으로 부른다. AI가 이름을 붙이면 바뀐다.
  */
@@ -15,7 +15,7 @@ function monthDay(iso: string) {
 
 export function ChatHeader({ item }: { item: Case }) {
   return (
-    <header className="-mb-3 flex w-full flex-col gap-2">
+    <header className="flex w-full flex-col gap-2">
       <div className="flex items-center gap-2">
         {/* 방패는 모바일 16 · PC 20 (m05 / h12). Icon은 크기를 속성으로 받으므로 CSS로 덮는다 */}
         <span className="flex shrink-0 text-brand max-md:[&_svg]:h-4 max-md:[&_svg]:w-4" aria-hidden>
