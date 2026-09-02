@@ -25,7 +25,11 @@ export function ChatHeader({ item }: { item: Case }) {
         </h1>
       </div>
       <div className="flex items-center gap-1">
-        <span className="text-[13.5px] text-muted">접수 {monthDay(item.createdAt)}</span>
+        <span className="text-[13.5px] text-muted">
+          접수 {monthDay(item.createdAt)}
+          {/* 영상이 붙은 뒤에만 늘어난다 — h14는 "접수 08-22", h16부터 "· 블랙박스 1건" */}
+          {item.video && ' · 블랙박스 1건'}
+        </span>
         <StatusBadge status={item.status} />
       </div>
       <div className="mt-1 h-px bg-line" />
