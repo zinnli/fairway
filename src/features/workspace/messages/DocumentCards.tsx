@@ -1,0 +1,131 @@
+import { Button } from '@/components/ui/Button';
+import { DISCLAIMER } from '@/config';
+import type { Rebuttal, Statement } from '@/domain/document';
+import { versionLabel } from '@/lib/document';
+import { AiMessage, AiNote, AiText } from './AiMessage';
+
+function timeLabel(iso: string) {
+  const d = new Date(iso);
+  const p = (n: number) => String(n).padStart(2, '0');
+  return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+/** 사건경위서 초안 — h26 */
+export function StatementDraftCard({
+  doc,
+  unknownNote,
+  onOpen,
+  onPrint,
+  onCreateRebuttal,
+  withDisclaimer,
+}: {
+  doc: Statement;
+  unknownNote: string | null;
+  onOpen: () => void;
+  onPrint: () => void;
+  onCreateRebuttal: () => void;
+  withDisclaimer?: boolean;
+}) {
+  return (
+    <AiMessage className="gap-3">
+      <div className="flex flex-wrap items-baseline gap-2">
+        <p className="text-[15px] font-semibold text-ink">사건경위서 초안이 준비됐어요</p>
+        <p className="text-[12.5px] font-medium text-muted">
+          {versionLabel(doc.version)} · {doc.pageCount}장
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-2 rounded-md border border-line-2 bg-surface p-4">
+        {doc.sections.slice(0, 2).map((section, i) => (
+          <p key={section.title} className="text-[13.5px] leading-[1.6] text-ink-3">
+            <span className="font-semibold text-ink">
+              {i + 1}. {section.title}
+            </span>{' '}
+            — {section.body.slice(0, 40)}…
+          </p>
+        ))}
+        <p className="text-[12.5px] text-muted">이하 생략 — 전문 보기</p>
+      </div>
+
+      <AiNote>
+        대화 {doc.reflectedMessageCount}건과 영상 분석 결과를 반영했어요.
+        {unknownNote && ` ${unknownNote}`}
+      </AiNote>
+
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={onOpen}>전문 보기</Button>
+        <Button variant="secondary" onClick={onPrint}>
+          PDF 받기
+        </Button>
+        <Button variant="secondary" onClick={onCreateRebuttal}>
+          반박의견서 만들기
+        </Button>
+      </div>
+
+      {withDisclaimer && (
+        <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>
+      )}
+    </AiMessage>
+  );
+}
+
+/** 반박의견서 초안 — h33 */
+export function RebuttalDraftCard({ doc, onOpen }: { doc: Rebuttal; onOpen: () => void }) {
+  const attached = doc.attachments.filter((a) => a.included).length;
+  return (
+    <AiMessage className="gap-3">
+      <p className="text-[15px] font-semibold text-ink">반박의견서 초안이 준비됐어요</p>
+      <div className="flex flex-col gap-1 rounded-md border border-line-2 bg-surface p-4 text-[13.5px] leading-[1.6]">
+        <p className="text-ink-3">
+          받는이 <span className="text-ink">{doc.to}</span>
+        </p>
+        <p className="text-ink-3">
+          제목 <span className="text-ink">{doc.subject}</span>
+        </p>
+        <p className="text-muted">첨부 {attached}개</p>
+      </div>
+      <Button className="self-start" onClick={onOpen}>
+        열어 보기
+      </Button>
+    </AiMessage>
+  );
+}
+
+/** 발송 완료 — h29 */
+export function SentCard({ at, to }: { at: string; to: string }) {
+  return (
+    <AiMessage className="gap-2">
+      <p className="text-[15px] font-semibold text-ink">반박의견서를 보냈어요</p>
+      <AiText>
+        {timeLabel(at)} · {to}
+      </AiText>
+      <AiNote>보낸 문서는 그대로 보관되고 수정할 수 없어요. 다시 보내려면 새 문서로 만들어요.</AiNote>
+    </AiMessage>
+  );
+}
+
+/** 다음 할 일 — h29 */
+const NEXT_STEPS = [
+  '보험사 회신을 기다려요 (보통 3~7일)',
+  '회신이 오면 채팅에 붙여넣어 주세요 — 함께 따져 볼게요',
+  '받아들여지지 않으면 내 보험사에 분쟁심의(보험사끼리 과실비율을 다시 따지는 절차) 청구를 요청하는 방법을 안내해 드려요',
+];
+
+export function NextStepsCard({ onOpenProcess }: { onOpenProcess: () => void }) {
+  return (
+    <AiMessage className="gap-3">
+      <p className="text-[15px] font-semibold text-ink">다음 할 일</p>
+      <ol className="flex flex-col gap-2 text-[14px] leading-[1.6] text-ink">
+        {NEXT_STEPS.map((step, i) => (
+          <li key={step} className="flex gap-2">
+            <span className="tnum shrink-0 text-muted">{i + 1}.</span>
+            <span className="min-w-0">{step}</span>
+          </li>
+        ))}
+      </ol>
+      <Button variant="secondary" className="self-start" onClick={onOpenProcess}>
+        분쟁심의 절차 미리 보기
+      </Button>
+    </AiMessage>
+  );
+}

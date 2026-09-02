@@ -1,0 +1,39 @@
+{
+  "name": "cardefender-fe",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "lint": "oxlint",
+    "preview": "vite preview",
+    "fonts:sync": "cp node_modules/pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css public/fonts/pretendard/ && cp -R node_modules/pretendard/dist/web/variable/woff2-dynamic-subset public/fonts/pretendard/"
+  },
+  "dependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-hook-form": "^7.86.0",
+    "react-router": "^8.3.0",
+    "tailwindcss": "^4.3.3",
+    "zod": "^4.4.3",
+    "zustand": "^5.0.15"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.1.0",
+    "msw": "^2.15.0",
+    "oxlint": "^1.79.0",
+    "pretendard": "^1.3.9",
+    "typescript": "~6.0.2",
+    "vite": "^8.2.2"
+  },
+  "packageManager": "pnpm@11.24.0",
+  "engines": {
+    "node": "22.x"
+  }
+}

@@ -1,0 +1,63 @@
+import type { Case, CaseSummary, HistoryEntry, VideoRef } from '@/domain/case';
+import type { Fact, FactKey } from '@/domain/fact';
+import type { Ratio, Verdict } from '@/domain/verdict';
+import type { Rebuttal, SentReceipt, Statement } from '@/domain/document';
+import type { ChatMessage, MessageBody } from '@/domain/message';
+
+/** 분석 진행 이벤트 — 실서버에서는 SSE, 목에서는 타이머 */
+export type AnalyzeEvent =
+  | { type: 'step'; label: string }
+  | { type: 'facts'; facts: Fact[]; title: string }
+  | { type: 'failed'; hint: string };
+
+/**
+ * 화면은 이 인터페이스만 안다.
+ * 02_기능명세서.md 맨 아래 "주고받는 데이터 요약"이 이 계약의 출처다.
+ * 백엔드가 붙는 날 바꾸는 건 src/api/index.ts 한 줄과 src/api/http/ 뿐이다.
+ */
+export interface Api {
+  listCases(): Promise<CaseSummary[]>;
+  getCase(caseId: string): Promise<Case>;
+  createCase(): Promise<Case>;
+  renameCase(caseId: string, title: string): Promise<void>;
+  deleteCase(caseId: string): Promise<void>;
+
+  /** 사건을 열 때 지난 대화를 되살린다. 대화는 추가만 하므로 이게 로그의 시작이다 */
+  listMessages(caseId: string): Promise<ChatMessage[]>;
+  /**
+   * 화면이 만든 카드를 로그에 남긴다 (되물음·내 대답처럼 서버가 모르는 것).
+   * 업로드 중·분석 중·오류처럼 지나가는 카드는 남기지 않는다.
+   */
+  appendMessage(caseId: string, body: MessageBody): Promise<void>;
+  sendMessage(caseId: string, text: string): Promise<void>;
+  uploadVideo(
+    caseId: string,
+    file: File,
+    onProgress: (percent: number) => void,
+    signal?: AbortSignal,
+  ): Promise<VideoRef>;
+
+  /** 업로드 완료 시 버튼 없이 자동으로 불린다 (02 기능명세서 1.4) */
+  analyze(caseId: string): AsyncIterable<AnalyzeEvent>;
+
+  /** 판정에 쓰인 항목이면 재판정된 Verdict를, 아니면 null을 돌려준다 (2.7) */
+  patchFact(caseId: string, key: FactKey, value: string): Promise<Verdict | null>;
+  /** 되물음에 답한다. value가 null이면 [확인 필요]로 남는다 */
+  answerQuestion(caseId: string, key: FactKey, value: string | null): Promise<void>;
+  /** 사실이 다 모였을 때 판정을 청한다 */
+  judge(caseId: string): Promise<Verdict>;
+  setOpponentClaim(caseId: string, ratio: Ratio): Promise<void>;
+
+  createStatement(caseId: string): Promise<Statement>;
+  rewriteStatement(caseId: string, note: string): Promise<Statement>;
+  renderStatementPdf(caseId: string): Promise<void>;
+
+  createRebuttal(caseId: string): Promise<Rebuttal>;
+  updateRebuttal(caseId: string, draft: Rebuttal): Promise<Rebuttal>;
+  sendRebuttal(caseId: string, draft: Rebuttal): Promise<SentReceipt>;
+
+  listHistory(caseId: string): Promise<HistoryEntry[]>;
+
+  /** 시연·리허설용. 심사 중에 반드시 쓰게 된다 */
+  resetDemo(): Promise<void>;
+}
