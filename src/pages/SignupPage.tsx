@@ -9,6 +9,8 @@ import { AuthCard } from '@/features/auth/AuthCard';
 import { TermsDialog } from '@/features/auth/TermsDialog';
 import { TERM_ORDER, type TermKey } from '@/features/auth/terms';
 import { zodResolver } from '@/lib/zodResolver';
+import { isApiError, service } from '@/api';
+import { useSessionStore } from '@/store/sessionStore';
 
 /**
  * S2 회원가입 — h04(기본) · h05(오류) · h40(약관 팝업).
@@ -53,6 +55,9 @@ export function SignupPage() {
   });
   const [openTerm, setOpenTerm] = useState<TermKey | null>(null);
   const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null);
+  /* 서버가 칸마다 붙여 준 문구 (§2.3 fields) */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const signIn = useSessionStore((s) => s.signIn);
 
   const {
     register,
@@ -65,9 +70,34 @@ export function SignupPage() {
   const allAgreed = TERM_ORDER.every((key) => agreed[key]);
   const canSubmit = isValid && allAgreed;
 
-  const onSubmit = handleSubmit(() => {
+  /**
+   * 형식·동의는 여기서 보고, 중복과 정책은 서버가 본다 (명세 A-1).
+   * 여러 항목이 함께 틀리면 서버가 fields에 전부 담아 준다 — 칸마다 그대로 붙인다.
+   */
+  const onSubmit = handleSubmit(async (form) => {
     setDuplicateEmail(null);
-    navigate('/cases', { replace: true });
+    setFieldErrors({});
+    try {
+      const session = await service.signup({
+        email: form.email,
+        password: form.password,
+        passwordConfirm: form.passwordConfirm,
+        agreements: {
+          termsOfService: agreed.service,
+          privacy: agreed.privacy,
+          videoConsent: agreed.video,
+        },
+      });
+      signIn(session);
+      navigate('/cases', { replace: true });
+    } catch (e) {
+      if (isApiError(e)) {
+        setFieldErrors(e.fields ?? {});
+        if (e.code === 'AUTH_EMAIL_DUPLICATED') setDuplicateEmail(form.email);
+        return;
+      }
+      setFieldErrors({ email: '연결이 끊겼어요. 잠시 후 다시 시도해 주세요.' });
+    }
   });
 
   return (
@@ -79,7 +109,9 @@ export function SignupPage() {
           autoComplete="email"
           placeholder="you@example.com"
           error={
-            duplicateEmail ? '이미 가입된 이메일이에요. 로그인해 주세요.' : errors.email?.message
+            duplicateEmail
+              ? '이미 가입된 이메일이에요. 로그인해 주세요.'
+              : (errors.email?.message ?? fieldErrors.email)
           }
           {...register('email')}
         />
@@ -88,7 +120,7 @@ export function SignupPage() {
           type="password"
           autoComplete="new-password"
           placeholder="8자 이상, 숫자 포함"
-          error={errors.password?.message}
+          error={errors.password?.message ?? fieldErrors.password}
           {...register('password')}
         />
         <Field
