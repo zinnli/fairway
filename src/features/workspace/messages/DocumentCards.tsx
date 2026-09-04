@@ -42,13 +42,15 @@ export function StatementDraftCard({
         </p>
       </div>
 
+      {/* 서버는 미리보기를 문장으로 준다. 목처럼 전문을 들고 있을 때만 우리가 만든다 */}
       <div className="flex flex-col gap-2 rounded-md border border-line-2 bg-surface p-4">
-        {doc.sections.slice(0, 2).map((section, i) => (
-          <p key={section.title} className="text-[13.5px] leading-[1.6] text-ink-3">
-            <span className="font-semibold text-ink">
-              {i + 1}. {section.title}
-            </span>{' '}
-            — {section.body.slice(0, 40)}…
+        {(doc.preview ??
+          doc.sections
+            .slice(0, 2)
+            .map((s, i) => `${i + 1}. ${s.title} — ${s.body.slice(0, 40)}…`)
+        ).map((line) => (
+          <p key={line} className="text-[13.5px] leading-[1.6] text-ink-3">
+            {line}
           </p>
         ))}
         <p className="text-[12.5px] text-muted">이하 생략 — 전문 보기</p>
@@ -114,19 +116,25 @@ export function SentCard({ at, to }: { at: string; to: string }) {
   );
 }
 
-/** 다음 할 일 — h29 */
+/** 다음 할 일 — h29. 서버가 주면 그것을 쓰고, 없으면 이 문구다 */
 const NEXT_STEPS = [
   '보험사 회신을 기다려요 (보통 3~7일)',
   '회신이 오면 채팅에 붙여넣어 주세요 — 함께 따져 볼게요',
   '받아들여지지 않으면 내 보험사에 분쟁심의(보험사끼리 과실비율을 다시 따지는 절차) 청구를 요청하는 방법을 안내해 드려요',
 ];
 
-export function NextStepsCard({ onOpenProcess }: { onOpenProcess: () => void }) {
+export function NextStepsCard({
+  steps = NEXT_STEPS,
+  onOpenProcess,
+}: {
+  steps?: string[];
+  onOpenProcess: () => void;
+}) {
   return (
     <AiMessage className="gap-3">
       <p className="text-[15px] font-semibold text-ink">다음 할 일</p>
       <ol className="flex flex-col gap-2 text-[14px] leading-[1.6] text-ink">
-        {NEXT_STEPS.map((step, i) => (
+        {steps.map((step, i) => (
           <li key={step} className="flex gap-2">
             <span className="tnum shrink-0 text-muted">{i + 1}.</span>
             <span className="min-w-0">{step}</span>

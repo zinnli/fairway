@@ -170,7 +170,14 @@ export function toMessage(m: MessageDto): ChatMessage | null {
   switch (m.type) {
     case 'text': {
       const p = m.payload as TextPayloadDto;
-      return { ...base, role: m.role === 'user' ? 'user' : 'ai', kind: 'text', text: p.text };
+      return {
+        ...base,
+        role: m.role === 'user' ? 'user' : 'ai',
+        kind: 'text',
+        text: p.text,
+        /* 서버가 붙여 준 단추 (h13 [영상 올리기]) */
+        ...(p.cta ? { cta: { label: p.cta.label, action: 'uploadVideo' as const } } : {}),
+      };
     }
     case 'guide': {
       /* 문구는 서버가 준다. 화면 GuideCard는 아직 자기 문구를 쓴다 (★) */
@@ -204,18 +211,23 @@ export function toMessage(m: MessageDto): ChatMessage | null {
         doc: {
           version: p.version,
           pageCount: p.pageCount,
-          /* 카드에는 미리보기 줄만 온다. 전문은 F-3으로 따로 받는다 */
-          sections: p.preview.map((line) => {
-            const [head, ...rest] = line.split(' — ');
-            return { title: head.replace(/^\d+\.\s*/, ''), body: rest.join(' — ') };
-          }),
+          /* 카드에는 미리보기 문장만 온다. 전문(sections)은 F-3으로 따로 받는다 */
+          preview: p.preview,
+          sections: [],
           updatedAt: m.createdAt,
         },
       };
     }
     case 'rebuttal_locked': {
+      /* 화면에 짝이 되는 카드가 없다. 종류를 늘리지 않고 단추 달린 글로 받는다 (h27) */
       const p = m.payload as RebuttalLockedPayloadDto;
-      return { ...base, role: 'ai', kind: 'text', text: p.text };
+      return {
+        ...base,
+        role: 'ai',
+        kind: 'text',
+        text: p.text,
+        cta: { label: '사건경위서 먼저 만들기', action: 'createStatement' as const },
+      };
     }
     case 'rebuttal_draft': {
       const p = m.payload as RebuttalDraftPayloadDto;
@@ -249,5 +261,19 @@ export function toMessage(m: MessageDto): ChatMessage | null {
   }
 }
 
-export const toMessages = (items: MessageDto[]): ChatMessage[] =>
-  items.map(toMessage).filter((m): m is ChatMessage => m !== null);
+/**
+ * 서버 카드 하나가 화면 카드 둘이 되기도 한다.
+ * `sent` 안에 "다음 할 일"이 같이 들어 있는데, 화면은 카드 둘로 나눠 쓴다 (h29).
+ */
+export function expandMessage(m: MessageDto): ChatMessage[] {
+  const mapped = toMessage(m);
+  if (!mapped) return [];
+  if (m.type !== 'sent') return [mapped];
+  const p = m.payload as SentPayloadDto;
+  return [
+    mapped,
+    { id: `${m.id}:next`, at: m.createdAt, role: 'ai', kind: 'nextSteps', steps: p.nextSteps },
+  ];
+}
+
+export const toMessages = (items: MessageDto[]): ChatMessage[] => items.flatMap(expandMessage);

@@ -23,6 +23,7 @@ import { setToken } from './tokens';
 import { subscribeCase } from './sse';
 import type { CaseDto, JobDto, SessionDto } from './dto';
 import {
+  expandMessage,
   toCase,
   toCaseSummary,
   toMessage,
@@ -219,8 +220,8 @@ export const httpService: CaseService = {
   subscribe: (caseId, on: CaseEvents) =>
     subscribeCase(caseId, {
       messageCreated: (m) => {
-        const mapped = toMessage(m);
-        if (mapped) on.message?.(mapped);
+        /* 발송 카드는 "다음 할 일"까지 둘로 갈라져 온다 */
+        for (const mapped of expandMessage(m)) on.message?.(mapped);
       },
       messageUpdated: (m) => {
         const mapped = toMessage(m);

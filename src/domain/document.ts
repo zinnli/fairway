@@ -11,6 +11,8 @@ export interface Statement {
   sections: StatementSection[];
   /** 초안 카드에 표시 */
   pageCount: number;
+  /** 카드에 보여 줄 미리보기 줄. 서버가 문장으로 준다 — 없으면 sections에서 만든다 */
+  preview?: string[];
   updatedAt: string;
 }
 
