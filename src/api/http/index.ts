@@ -93,14 +93,20 @@ export const httpService: CaseService = {
     }
   },
 
-  /** ★ A-9는 아직 보류다(부록 B-1). 서버가 안 열었으면 조용히 null을 준다 */
-  demoLogin: async () => {
+  isEmailAvailable: (email) => authApi.emailAvailable(email),
+
+  getLegalDoc: async (docType) => {
     try {
-      return toSession(await authApi.demoLogin());
+      return (await authApi.legal(docType)).bodyMarkdown;
     } catch {
+      /* 아직 안 올렸으면 화면이 아는 문구를 쓴다 — 빈 창을 띄우지 않는다 */
       return null;
     }
   },
+
+  requestPasswordReset: async (email) => (await authApi.requestPasswordReset(email)).message,
+
+  resetPassword: async (input) => (await authApi.confirmPasswordReset(input)).message,
 
   completeOnboarding: async (skipped) => {
     await authApi.completeOnboarding({ completed: !skipped, skipped });

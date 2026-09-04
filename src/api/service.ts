@@ -62,11 +62,21 @@ export interface CaseService {
     agreements: { termsOfService: boolean; privacy: boolean; videoConsent: boolean };
   }): Promise<Session>;
   logout(): Promise<void>;
+  /** 가입 전에 미리 물어보는 보조 수단 (A-6). 진짜 판정은 signup이 한다 */
+  isEmailAvailable(email: string): Promise<{ available: boolean; reason: string | null }>;
   /** 새로고침 뒤 세션 되살리기. 쿠키만으로 동작하고, 실패하면 null */
   restoreSession(): Promise<Session | null>;
-  /** 체험 계정으로 들어가기 (기능명세 6.3). 서버가 아직 안 열었으면 null */
-  demoLogin(): Promise<Session | null>;
   completeOnboarding(skipped: boolean): Promise<void>;
+  /** 약관 전문 (A-11). 서버가 없으면 null — 화면이 아는 문구로 대신한다 */
+  getLegalDoc(docType: 'terms' | 'privacy' | 'video-consent'): Promise<string | null>;
+  /** 재설정 메일 보내기 (A-7). 가입되지 않은 주소여도 성공으로 답한다 */
+  requestPasswordReset(email: string): Promise<string>;
+  /** 메일 링크로 돌아와 새 비밀번호를 정한다 (A-8). 토큰은 30분 · 1회용 */
+  resetPassword(input: {
+    token: string;
+    password: string;
+    passwordConfirm: string;
+  }): Promise<string>;
 
   /* ── 사건 ─────────────────────────────────────────────── */
   listCases(): Promise<CaseSummary[]>;

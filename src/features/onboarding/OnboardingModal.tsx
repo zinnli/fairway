@@ -41,7 +41,14 @@ function SlideDots({ index, className }: { index: number; className?: string }) 
   );
 }
 
-export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function OnboardingModal({
+  open,
+  onClose,
+}: {
+  open: boolean;
+  /** skipped — 끝까지 보지 않고 닫았는가 (A-10에 그대로 넘어간다) */
+  onClose: (skipped: boolean) => void;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
   const [index, setIndex] = useState(0);
@@ -58,10 +65,10 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      onClose={() => onClose(true)}
       onCancel={(e) => {
         e.preventDefault();
-        onClose();
+        onClose(true);
       }}
       aria-labelledby={titleId}
       className={cn(
@@ -76,7 +83,7 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
         <div className="flex justify-end sm:hidden">
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => onClose(true)}
             className="inline-flex min-h-11 items-center rounded-md px-2 text-[13.5px] text-muted hover:bg-bg-2"
           >
             건너뛰기
@@ -92,14 +99,14 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
           {index === 0 && (
             <button
               type="button"
-              onClick={onClose}
+              onClick={() => onClose(true)}
               className="absolute top-5 right-14 box-border hidden items-center rounded-full border border-line bg-surface px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2 hover:bg-bg sm:inline-flex"
             >
               건너뛰기
             </button>
           )}
           <div className="absolute top-4 right-4 hidden sm:block">
-            <Button variant="icon" onClick={onClose} aria-label="온보딩 닫기">
+            <Button variant="icon" onClick={() => onClose(true)} aria-label="온보딩 닫기">
               <Icon name="close" size={16} />
             </Button>
           </div>
@@ -134,7 +141,7 @@ export function OnboardingModal({ open, onClose }: { open: boolean; onClose: () 
               </Button>
             )}
             {isLast ? (
-              <Button size="lg" onClick={onClose} className="max-sm:flex-1">
+              <Button size="lg" onClick={() => onClose(false)} className="max-sm:flex-1">
                 <Icon name="plus" size={16} strokeWidth={2} />
                 새 사건 만들기
               </Button>

@@ -55,6 +55,20 @@ export function SignupPage() {
   });
   const [openTerm, setOpenTerm] = useState<TermKey | null>(null);
   const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null);
+  /**
+   * A-6 이메일 중복 확인. 가입 눌러 보기 전에 미리 알려 준다.
+   * 명세대로 **보조 수단**이라 실패해도 조용히 넘어간다 — 진짜 판정은 A-1이 한다.
+   */
+  const checkEmail = async (email: string) => {
+    if (!email || errors.email) return;
+    try {
+      const { available, reason } = await service.isEmailAvailable(email);
+      setDuplicateEmail(available ? null : email);
+      if (!available && reason) setFieldErrors((prev) => ({ ...prev, email: reason }));
+    } catch {
+      /* 못 물어봐도 가입은 막지 않는다 */
+    }
+  };
   /* 서버가 칸마다 붙여 준 문구 (§2.3 fields) */
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const signIn = useSessionStore((s) => s.signIn);
@@ -114,6 +128,7 @@ export function SignupPage() {
               : (errors.email?.message ?? fieldErrors.email)
           }
           {...register('email')}
+          onBlur={(e) => void checkEmail(e.target.value.trim())}
         />
         <Field
           label="비밀번호"
@@ -128,7 +143,7 @@ export function SignupPage() {
           type="password"
           autoComplete="new-password"
           placeholder="한 번 더 입력"
-          error={errors.passwordConfirm?.message}
+          error={errors.passwordConfirm?.message ?? fieldErrors.passwordConfirm}
           {...register('passwordConfirm')}
         />
 
@@ -145,6 +160,10 @@ export function SignupPage() {
           <p className="pl-7 text-[12.5px] leading-[1.5] text-muted">
             영상은 과실비율 분석에만 쓰고, 사건을 지우면 함께 지워져요.
           </p>
+          {/* 서버가 동의를 물리면 그 문구를 그대로 붙인다 (AGREEMENT_REQUIRED) */}
+          {fieldErrors.agreements && (
+            <p className="pl-7 text-[12.5px] leading-[1.5] text-danger">{fieldErrors.agreements}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

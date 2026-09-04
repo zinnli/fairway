@@ -1,8 +1,10 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate, useSearchParams } from 'react-router';
 import { isApiError, service } from '@/api';
 import { useSessionStore } from '@/store/sessionStore';
+import { NewPasswordForm } from '@/features/auth/NewPasswordForm';
+import { PasswordResetDialog } from '@/features/auth/PasswordResetDialog';
 import { z } from 'zod';
 import { Button } from '@/components/ui/Button';
 import { Field } from '@/components/ui/Field';
@@ -31,6 +33,10 @@ export function LoginPage() {
   const signIn = useSessionStore((s) => s.signIn);
   /* 서버가 준 문구. 어느 칸 아래에 붙일지도 서버가 fields로 알려 준다 */
   const [failed, setFailed] = useState<string | null>(null);
+  const [resetOpen, setResetOpen] = useState(false);
+  /* 메일 링크로 돌아오면 같은 길에서 새 비밀번호를 정한다 (A-8) — 라우트를 늘리지 않는다 */
+  const [params, setParams] = useSearchParams();
+  const resetToken = params.get('reset');
   const {
     register,
     handleSubmit,
@@ -53,6 +59,20 @@ export function LoginPage() {
       );
     }
   });
+
+  if (resetToken) {
+    return (
+      <AuthCard title="새 비밀번호 정하기">
+        <NewPasswordForm
+          token={resetToken}
+          onDone={() => {
+            params.delete('reset');
+            setParams(params, { replace: true });
+          }}
+        />
+      </AuthCard>
+    );
+  }
 
   return (
     <AuthCard title="로그인">
@@ -77,18 +97,21 @@ export function LoginPage() {
           />
           {/* 터치 영역 44 확보를 위해 링크를 감싼 상자를 키운다 */}
           <div className="flex justify-end">
-            <Link
-              to="/login"
+            <button
+              type="button"
+              onClick={() => setResetOpen(true)}
               className="inline-flex min-h-11 items-center rounded-md px-2 text-[13.5px] font-medium text-brand hover:bg-bg-2 sm:min-h-8"
             >
               비밀번호를 잊었어요
-            </Link>
+            </button>
           </div>
         </div>
         <Button type="submit" size="lg" disabled={isSubmitting}>
           {isSubmitting ? '확인하는 중…' : '로그인'}
         </Button>
       </form>
+      <PasswordResetDialog open={resetOpen} onClose={() => setResetOpen(false)} />
+
       <p className="text-center text-[13.5px] text-ink-3">
         계정이 없어요 →{' '}
         <Link to="/signup" className="font-medium text-brand hover:underline">

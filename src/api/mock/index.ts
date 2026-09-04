@@ -136,23 +136,64 @@ const latestStatement = (caseId: string): Statement | null => {
 
 /* ── 구현 ─────────────────────────────────────────────────────────────── */
 
+/**
+ * 목의 세션 — 자격은 보지 않지만 **로그인은 실제로 거쳐야 한다** (9/5 결정).
+ * 그러지 않으면 목으로 도는 동안에는 가드가 아무것도 막지 못한다.
+ *
+ * 새로고침해도 남아야 해서 브라우저에 적어 둔다. 목에는 토큰이 없고 누구인지만 적으므로
+ * "액세스 토큰은 메모리에만" 규칙과 부딪히지 않는다 — http 구현은 지금도 메모리다.
+ */
+const SESSION_KEY = 'cardefender.mock.session';
+
+const readSession = (): Session | null => {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeSession = (user: Session | null) => {
+  try {
+    if (user) localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    else localStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* 시크릿 창처럼 못 쓰는 경우 — 그 창에서는 새로고침하면 다시 로그인한다 */
+  }
+};
+
+const asUser = (email: string): Session => ({
+  id: 'demo-user',
+  email,
+  onboardedAt: null,
+  isDemo: true,
+});
+
 export const mockService: CaseService = {
-  /* 목에는 로그인 서버가 없다. 심사위원이 주소만 열어도 되게 늘 통과시킨다 (기능명세 6.3) */
-  login: async (email) => ({ id: 'demo-user', email, onboardedAt: null, isDemo: true }),
-  signup: async (input) => ({ id: 'demo-user', email: input.email, onboardedAt: null, isDemo: true }),
-  logout: async () => {},
-  restoreSession: async () => ({
-    id: 'demo-user',
-    email: 'demo@cardefender.kr',
-    onboardedAt: null,
-    isDemo: true,
-  }),
-  demoLogin: async () => ({
-    id: 'demo-user',
-    email: 'demo@cardefender.kr',
-    onboardedAt: null,
-    isDemo: true,
-  }),
+  /* 목에는 가입자 명부가 없다. 형식만 맞으면 들여보내되, 거치기는 거쳐야 한다 */
+  login: async (email) => {
+    const user = asUser(email);
+    writeSession(user);
+    return user;
+  },
+  signup: async (input) => {
+    const user = asUser(input.email);
+    writeSession(user);
+    return user;
+  },
+  logout: async () => writeSession(null),
+  restoreSession: async () => readSession(),
+  /* 목에는 법무 문구가 없다. 화면이 아는 것을 쓰게 null을 준다 */
+  getLegalDoc: async () => null,
+
+  /* 목에는 메일이 없다. 문구만 서버와 같게 돌려준다 */
+  requestPasswordReset: async () => '비밀번호 재설정 링크를 보냈어요. 메일함을 확인해 주세요.',
+  resetPassword: async () => '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.',
+
+  /* 목에는 가입자 명부가 없다. 시연에 걸리지 않게 늘 쓸 수 있다고 한다 */
+  isEmailAvailable: async () => ({ available: true, reason: null }),
+
   completeOnboarding: async () => {},
 
   listCases: async () =>

@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Sidebar } from '@/features/cases/Sidebar';
+import { service } from '@/api';
 import { OnboardingModal } from '@/features/onboarding/OnboardingModal';
 import { useCaseStore } from '@/store/caseStore';
 
@@ -55,7 +56,14 @@ export function CasesPage() {
         </Button>
       </main>
 
-      <OnboardingModal open={empty && !onboardingSeen} onClose={markOnboardingSeen} />
+      {/* 끝까지 봤든 건너뛰었든 서버에 남긴다 — 다음에 들어올 때 다시 뜨지 않게 (A-10) */}
+      <OnboardingModal
+        open={empty && !onboardingSeen}
+        onClose={(skipped) => {
+          markOnboardingSeen();
+          void service.completeOnboarding(skipped);
+        }}
+      />
     </div>
   );
 }
