@@ -147,6 +147,12 @@ export const mockService: CaseService = {
     onboardedAt: null,
     isDemo: true,
   }),
+  demoLogin: async () => ({
+    id: 'demo-user',
+    email: 'demo@cardefender.kr',
+    onboardedAt: null,
+    isDemo: true,
+  }),
   completeOnboarding: async () => {},
 
   listCases: async () =>

@@ -64,6 +64,8 @@ export interface CaseService {
   logout(): Promise<void>;
   /** 새로고침 뒤 세션 되살리기. 쿠키만으로 동작하고, 실패하면 null */
   restoreSession(): Promise<Session | null>;
+  /** 체험 계정으로 들어가기 (기능명세 6.3). 서버가 아직 안 열었으면 null */
+  demoLogin(): Promise<Session | null>;
   completeOnboarding(skipped: boolean): Promise<void>;
 
   /* ── 사건 ─────────────────────────────────────────────── */

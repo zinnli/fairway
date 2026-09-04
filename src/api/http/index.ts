@@ -93,6 +93,15 @@ export const httpService: CaseService = {
     }
   },
 
+  /** ★ A-9는 아직 보류다(부록 B-1). 서버가 안 열었으면 조용히 null을 준다 */
+  demoLogin: async () => {
+    try {
+      return toSession(await authApi.demoLogin());
+    } catch {
+      return null;
+    }
+  },
+
   completeOnboarding: async (skipped) => {
     await authApi.completeOnboarding({ completed: !skipped, skipped });
   },
