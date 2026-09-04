@@ -30,6 +30,9 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return { messages: action.messages };
 
     case 'append':
+      /* 같은 카드가 두 번 오는 일(내가 방금 붙인 글이 이벤트로 되돌아오는 등)은 여기서 막는다.
+         화면 쪽 거울로 거르면 같은 틱에 둘이 오면 놓친다 */
+      if (state.messages.some((m) => m.id === action.message.id)) return state;
       return { messages: [...state.messages, action.message] };
 
     case 'progress':

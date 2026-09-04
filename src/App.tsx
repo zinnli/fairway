@@ -1,5 +1,6 @@
-import { Suspense, lazy } from 'react';
-import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { Suspense, lazy, useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useNavigate } from 'react-router';
+import { service, setSessionLostHandler } from '@/api';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
@@ -20,9 +21,32 @@ const DesignSystemPage = lazy(() =>
   import('@/pages/DesignSystemPage').then((m) => ({ default: m.DesignSystemPage })),
 );
 
+/**
+ * 세션 배선. 라우터 안이라야 길을 낼 수 있어서 컴포넌트로 둔다.
+ *
+ * · 새로고침하면 액세스 토큰이 사라진다(메모리에만 두므로) — refresh 쿠키로 한 번 되살린다
+ * · 그래도 안 풀리면 로그인 화면으로 보낸다. 조용히 빈 화면이 되는 것을 막는다
+ *
+ * ★ 라우트 가드는 아직 세우지 않는다 — 심사위원 접속 방식(기능명세 6.3)이 미정이라
+ *   체험 계정이면 가드+자동 로그인, 익명 세션이면 가드 없음으로 모양이 갈린다.
+ *   목으로 도는 동안에는 401이 날 일이 없어 이 배선이 시연을 막지 않는다.
+ */
+function Session() {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    void service.restoreSession();
+    setSessionLostHandler(() => navigate('/login', { replace: true }));
+    return () => setSessionLostHandler(null);
+  }, [navigate]);
+
+  return null;
+}
+
 export function App() {
   return (
     <BrowserRouter>
+      <Session />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />

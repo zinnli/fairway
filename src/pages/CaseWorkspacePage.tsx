@@ -63,6 +63,9 @@ export function CaseWorkspacePage() {
   );
   /* F01 영상 뷰어 */
   const [playing, setPlaying] = useState<VideoRef | null>(null);
+  /* 경위서 전문. 카드에는 미리보기만 있어서 열 때 받아 둔다.
+     어느 사건 것인지까지 같이 들고 있어서 사건을 바꾸면 저절로 무효가 된다 */
+  const [fullDoc, setFullDoc] = useState<{ id: string; doc: Statement } | null>(null);
   /* 팝업 2종도 서랍과 같은 규칙을 쓴다 */
   const [popup, setPopup] = useState<{
     key: string;
@@ -185,17 +188,31 @@ export function CaseWorkspacePage() {
   );
 
   /**
+   * 경위서 전문 — 카드에는 미리보기 줄만 온다. 전문은 열 때 따로 받는다 (명세 F-3).
+   * 다시 쓰면 버전이 오르므로 열 때마다 새로 받는다.
+   */
+  const openStatement = useCallback(async () => {
+    setDrawer({ key: viewKey, which: 'statement' });
+    try {
+      const full = await service.getStatement(caseId);
+      if (activeCase.current === caseId) setFullDoc({ id: caseId, doc: full });
+    } catch {
+      /* 못 받으면 카드가 아는 만큼만 보인다 */
+    }
+  }, [caseId, viewKey]);
+
+  /**
    * 서류 만들기 — 셋 다 "청하고 끝"이다. 202만 오고 **카드는 이벤트로 들어온다.**
    * 도는 동안은 activeJob이 서 있어서 단추가 잠긴다.
    */
   const createStatement = useCallback(async () => {
     /* 판정 카드와 현황판 두 곳에서 부른다. 이미 있으면 새로 만들지 않고 연다 */
     if (statementRef.current) {
-      setDrawer({ key: viewKey, which: 'statement' });
+      void openStatement();
       return;
     }
     await service.createStatement(caseId);
-  }, [caseId, viewKey]);
+  }, [caseId, openStatement]);
 
   /* 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드가 아래에 붙는다 */
   const rewriteStatement = useCallback(
@@ -252,11 +269,17 @@ export function CaseWorkspacePage() {
     [caseId],
   );
 
-  /* 사건에 처음 들어올 때 한 번. 이후 갱신은 전부 이벤트로 받는다 (폴링하지 않는다) */
+  /**
+   * 사건에 처음 들어올 때 한 번 읽고, **읽고 나서** 채널에 붙는다.
+   * 순서가 뒤집히면 먼저 도착한 카드를 뒤늦은 reset이 덮어 버린다.
+   * 이후 갱신은 전부 이벤트로 받는다 — 폴링하지 않는다 (명세 §6).
+   */
   useEffect(() => {
     let alive = true;
+    let stop: (() => void) | null = null;
     activeCase.current = caseId;
     loadingCardId.current = null;
+
     Promise.all([service.getCase(caseId), service.listMessages(caseId)])
       .then(([{ item: c, activeJob: job }, past]) => {
         if (!alive) return;
@@ -268,47 +291,40 @@ export function CaseWorkspacePage() {
           type: 'reset',
           messages: past.length ? past : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
         });
+
+        stop = service.subscribe(caseId, {
+          /* 같은 카드가 두 번 오는 것은 reducer가 id로 막는다 */
+          message: (message) => dispatch({ type: 'append', message }),
+          messageUpdated: (message) => dispatch({ type: 'settle', message }),
+          caseUpdated: (item, activeJobNow) => {
+            setLoaded({ id: caseId, item });
+            setActiveJob(activeJobNow);
+            void reloadList();
+          },
+          /* 채널이 끊겼고 되살리지 못했다 — 사건과 대화를 다시 읽어 맞춘다 */
+          lost: () => {
+            void refresh();
+            void service.listMessages(caseId).then((again) => {
+              if (activeCase.current === caseId && again.length) {
+                dispatch({ type: 'reset', messages: again });
+              }
+            });
+          },
+        });
+        /* 읽는 사이에 사건을 떠났으면 붙자마자 뗀다 */
+        if (!alive) {
+          stop();
+          stop = null;
+        }
       })
       .catch(() => {
         if (alive) setLoaded({ id: caseId, item: null });
       });
+
     return () => {
       alive = false;
+      stop?.();
     };
-  }, [caseId]);
-
-  /**
-   * 실시간 채널. 분석 요약·되물음·판정·서류 카드가 전부 여기로 들어온다.
-   * 같은 카드가 두 번 들어오는 일(내가 방금 붙인 글이 되돌아오는 등)은 id로 막는다.
-   */
-  useEffect(() => {
-    const stop = service.subscribe(caseId, {
-      message: (message) => {
-        if (activeCase.current !== caseId) return;
-        if (messagesRef.current.some((m) => m.id === message.id)) return;
-        dispatch({ type: 'append', message });
-      },
-      messageUpdated: (message) => {
-        if (activeCase.current !== caseId) return;
-        dispatch({ type: 'settle', message });
-      },
-      caseUpdated: (item, job) => {
-        if (activeCase.current !== caseId) return;
-        setLoaded({ id: caseId, item });
-        setActiveJob(job);
-        void reloadList();
-      },
-      /* 채널이 끊겼고 되살리지 못했다 — 사건과 대화를 다시 읽어 맞춘다 */
-      lost: () => {
-        void refresh();
-        void service.listMessages(caseId).then((past) => {
-          if (activeCase.current === caseId && past.length) {
-            dispatch({ type: 'reset', messages: past });
-          }
-        });
-      },
-    });
-    return stop;
   }, [caseId, refresh, reloadList]);
 
   /**
@@ -316,17 +332,25 @@ export function CaseWorkspacePage() {
    * 서버가 단계를 내려보내지 않으므로 화면이 activeJob만 보고 세웠다 치운다.
    */
   useEffect(() => {
-    const busy = activeJob?.kind === 'analysis' || activeJob?.kind === 'verdict';
-    if (busy && loadingCardId.current === null) {
+    /* 서류 작업(report·rebuttal)은 카드를 세우지 않는다 — 단추만 잠근다 */
+    const phase =
+      activeJob?.kind === 'analysis' || activeJob?.kind === 'verdict' ? activeJob.kind : null;
+    if (phase && loadingCardId.current === null) {
       const id = nextId();
       loadingCardId.current = id;
-      dispatch({ type: 'append', message: { id, at: now(), role: 'ai', kind: 'analyzing' } });
+      dispatch({
+        type: 'append',
+        message: { id, at: now(), role: 'ai', kind: 'analyzing', phase },
+      });
     }
-    if (!busy && loadingCardId.current !== null) {
+    if (!phase && loadingCardId.current !== null) {
       dispatch({ type: 'drop', id: loadingCardId.current });
       loadingCardId.current = null;
     }
   }, [activeJob]);
+
+  /** 이 사건의 전문을 받아 뒀나. 아니면 카드가 아는 만큼만 보여 준다 */
+  const statementFull = fullDoc?.id === caseId ? fullDoc.doc : null;
 
   /** 서류 작업이 도는 동안은 [다시 쓰기]·[만들기]를 잠근다 */
   const rewriting = activeJob?.kind === 'report';
@@ -335,6 +359,24 @@ export function CaseWorkspacePage() {
    * PDF — 서버가 만들어 준다. 목은 인쇄 CSS로 대신한다.
    * 어느 쪽이든 html2canvas는 쓰지 않는다 (한글이 이미지로 뭉개진다).
    */
+  /**
+   * 영상 뷰어 — 카드에는 이름·길이만 있고 재생 주소는 없다 (명세 §4.4).
+   * 열면서 받아 온다. 서명이 붙어 있고 10분이면 만료돼서 미리 받아 둘 수도 없다.
+   */
+  const openVideo = useCallback(
+    async (video: VideoRef) => {
+      setPlaying(video);
+      try {
+        const full = await service.getVideo(video.id);
+        if (activeCase.current !== caseId) return;
+        setPlaying((cur) => (cur?.id === video.id ? { ...cur, ...full } : cur));
+      } catch {
+        /* 못 받아도 카드가 아는 만큼은 보여 준다 — 뷰어가 사정을 알린다 */
+      }
+    },
+    [caseId],
+  );
+
   const savePdf = useCallback(async () => {
     await service.downloadStatementPdf(caseId, statementRef.current?.version ?? 1);
   }, [caseId]);
@@ -405,8 +447,8 @@ export function CaseWorkspacePage() {
   return (
     <>
       {/* 인쇄할 때는 화면 껍데기를 통째로 감추고 서류만 남긴다 (html2canvas 금지) */}
-      {statement && item && (
-        <PrintableStatement doc={statement} title={item.title ?? '새 사건'} />
+      {(statementFull ?? statement) && item && (
+        <PrintableStatement doc={(statementFull ?? statement)!} title={item.title ?? '새 사건'} />
       )}
       <div className="flex h-dvh bg-bg-3 print:hidden">
       {/* 1024 이상에서만 붙박이. 그 아래는 왼쪽 서랍이 같은 부품을 쓴다 */}
@@ -458,14 +500,14 @@ export function CaseWorkspacePage() {
                   sampleLoading: fetchingSample,
                   onOpenPrecedent: (p) => pop('precedent', p),
                   onCreateStatement: () => void createStatement(),
-                  onOpenStatement: () => show('statement'),
+                  onOpenStatement: () => void openStatement(),
                   onPrintStatement: () => void savePdf(),
                   onRewriteStatement: () => void rewriteStatement(),
                   statementRewriting: rewriting,
                   onCreateRebuttal: () => void createRebuttal(),
                   onOpenRebuttal: () => show('rebuttal'),
                   onOpenProcess: () => pop('process'),
-                  onOpenVideo: setPlaying,
+                  onOpenVideo: (video) => void openVideo(video),
                 }}
               />
             ))}
@@ -493,7 +535,7 @@ export function CaseWorkspacePage() {
             statement={statement}
             rebuttal={rebuttal}
             showDisclaimer={disclaimerCardId === null}
-            onOpenStatement={() => (statement ? show('statement') : void createStatement())}
+            onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
           />
         </div>
@@ -510,7 +552,7 @@ export function CaseWorkspacePage() {
 
       <StatementDialog
         open={openDrawer === 'statement'}
-        doc={statement}
+        doc={statementFull ?? statement}
         onRewrite={(instruction) => void rewriteStatement(instruction)}
         rewriting={rewriting}
         onClose={() => setDrawer(null)}
@@ -564,7 +606,7 @@ export function CaseWorkspacePage() {
             statement={statement}
             rebuttal={rebuttal}
             showDisclaimer={disclaimerCardId === null}
-            onOpenStatement={() => (statement ? show('statement') : void createStatement())}
+            onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
           />
         )}
