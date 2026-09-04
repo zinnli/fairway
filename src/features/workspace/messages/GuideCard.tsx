@@ -1,18 +1,21 @@
 import { Button } from '@/components/ui/Button';
-import { APP_NAME, SAMPLE_VIDEO, VIDEO_LIMITS } from '@/config';
+import { APP_NAME, VIDEO_LIMITS } from '@/config';
+import { SampleVideoPicker } from '@/features/workspace/SampleVideoPicker';
 import { AiMessage, AiNote, AiText } from './AiMessage';
 
 /**
  * 접수 안내 — h12. 사건을 만들면 제일 먼저 붙는 카드다.
  * [영상 올리기]는 입력 바의 [+]와 같은 일을 한다. 둘 다 같은 파일 선택창을 연다.
- * [예시 영상으로 해보기]는 올릴 영상이 없는 사람을 위한 길이다 — 고른 뒤는 완전히 같다.
+ * [샘플 영상 올리기]는 올릴 영상이 없는 사람을 위한 길이다 — 고른 뒤는 완전히 같다.
  */
 export function GuideCard({
   onPickVideo,
   onPickSample,
+  sampleLoading,
 }: {
   onPickVideo: () => void;
-  onPickSample: () => void;
+  onPickSample: (file: string) => void;
+  sampleLoading?: boolean;
 }) {
   return (
     <AiMessage>
@@ -28,12 +31,7 @@ export function GuideCard({
         <Button size="lg" onClick={onPickVideo}>
           영상 올리기
         </Button>
-        {/* 파일이 준비되지 않았으면 config에서 null로 두고 단추를 숨긴다 */}
-        {SAMPLE_VIDEO && (
-          <Button size="lg" variant="secondary" onClick={onPickSample}>
-            예시 영상으로 해보기
-          </Button>
-        )}
+        <SampleVideoPicker onPick={onPickSample} loading={sampleLoading} />
       </div>
     </AiMessage>
   );

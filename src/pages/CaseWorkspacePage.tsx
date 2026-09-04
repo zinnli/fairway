@@ -7,7 +7,7 @@ import { RebuttalDialog } from '@/features/documents/RebuttalDialog';
 import { PrecedentDialog, ProcessDialog } from '@/features/workspace/dialogs/GroundDialogs';
 import { ErrorDialog, SendConfirmDialog } from '@/features/workspace/dialogs/AlertDialogs';
 import { VideoDialog } from '@/features/workspace/dialogs/VideoDialog';
-import { SAMPLE_VIDEO, VIDEO_LIMITS } from '@/config';
+import { sampleVideoUrl, VIDEO_LIMITS } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { ChatMessage, MessageBody } from '@/domain/message';
 import type { Precedent } from '@/domain/verdict';
@@ -89,8 +89,8 @@ export function CaseWorkspacePage() {
   /* 지금 보고 있는 사건. 업로드·분석이 도는 동안 사건을 바꾸면
      끝난 결과가 남의 대화에 붙는다 — 그걸 막는 문지기다 */
   const activeCase = useRef(caseId);
-  /* 예시 영상을 받아 오는 중. 연타로 두 번 올라가는 것을 막는다 */
-  const fetchingSample = useRef(false);
+  /* 예시 영상을 받아 오는 중. 연타로 두 번 올라가는 것을 막고 단추도 잠근다 */
+  const [fetchingSample, setFetchingSample] = useState(false);
   /* 경위서를 다시 쓰는 중. 진행 화면(h31)이 없어서 단추 잠금으로만 알린다 */
   const [rewriting, setRewriting] = useState(false);
 
@@ -206,20 +206,23 @@ export function CaseWorkspacePage() {
   /* 예시 영상 — public/sample/에 있는 파일을 받아 진짜 고른 것처럼 같은 길로 흘린다.
      여기서 File을 만들어 두면 업로드부터는 손으로 고른 것과 구분되지 않는다.
      서버가 붙어도 이 길은 그대로다 (실제 업로드가 된다) */
-  const pickSample = useCallback(async () => {
-    if (!SAMPLE_VIDEO || fetchingSample.current) return;
-    fetchingSample.current = true;
-    try {
-      const res = await fetch(SAMPLE_VIDEO.url);
-      if (!res.ok) return;
-      const blob = await res.blob();
-      await startUpload(new File([blob], SAMPLE_VIDEO.name, { type: blob.type || 'video/mp4' }));
-    } catch {
-      /* 예시 파일이 없거나 못 받은 경우. 화면은 그대로 두고 [영상 올리기]로 가면 된다 */
-    } finally {
-      fetchingSample.current = false;
-    }
-  }, [startUpload]);
+  const pickSample = useCallback(
+    async (fileName: string) => {
+      if (fetchingSample) return;
+      setFetchingSample(true);
+      try {
+        const res = await fetch(sampleVideoUrl(fileName));
+        if (!res.ok) return;
+        const blob = await res.blob();
+        await startUpload(new File([blob], fileName, { type: blob.type || 'video/mp4' }));
+      } catch {
+        /* 예시 파일이 없거나 못 받은 경우. 화면은 그대로 두고 [영상 올리기]로 가면 된다 */
+      } finally {
+        setFetchingSample(false);
+      }
+    },
+    [fetchingSample, startUpload],
+  );
 
   const createStatement = useCallback(async () => {
     /* 판정 카드와 현황판 두 곳에서 부른다. 이미 있으면 새로 만들지 않고 연다 */
@@ -460,7 +463,8 @@ export function CaseWorkspacePage() {
                 withDisclaimer={message.id === disclaimerCardId}
                 actions={{
                   onPickVideo: pickVideo,
-                  onPickSample: () => void pickSample(),
+                  onPickSample: (file) => void pickSample(file),
+                  sampleLoading: fetchingSample,
                   onOpenPrecedent: (p) => pop('precedent', p),
                   onCreateStatement: () => void createStatement(),
                   onOpenStatement: () => show('statement'),

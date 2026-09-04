@@ -15,7 +15,9 @@ import { VerdictCard } from './VerdictCard';
  */
 export interface MessageActions {
   onPickVideo: () => void;
-  onPickSample: () => void;
+  onPickSample: (file: string) => void;
+  /** 예시 영상을 받아 오는 중 */
+  sampleLoading?: boolean;
   onOpenPrecedent: (precedent: Precedent) => void;
   onCreateStatement: () => void;
   onOpenStatement: () => void;
@@ -41,7 +43,11 @@ export function MessageItem({
 }) {
   switch (message.kind) {
     case 'guide':
-      return <GuideCard onPickVideo={actions.onPickVideo} onPickSample={actions.onPickSample} />;
+      return <GuideCard
+          onPickVideo={actions.onPickVideo}
+          onPickSample={actions.onPickSample}
+          sampleLoading={actions.sampleLoading}
+        />;
 
     case 'text':
       /* 같은 kind가 역할에 따라 말풍선이 되기도, 카드 없는 AI 답변이 되기도 한다.
