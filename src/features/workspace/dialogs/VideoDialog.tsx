@@ -25,10 +25,14 @@ export function VideoDialog({
 }) {
   /* 재생에 실패한 영상의 id. 다른 영상을 열면 다시 시도한다 */
   const [failedId, setFailedId] = useState<string | null>(null);
-  const playable = video !== null && video.objectUrl !== undefined && failedId !== video.id;
+  const src = video?.streamUrl ?? video?.objectUrl;
+  const playable = video !== null && src !== undefined && failedId !== video.id;
 
   const meta = video
-    ? [video.durationSec > 0 ? durationLabel(video.durationSec) : null, mb(video.sizeBytes)]
+    ? [
+        video.durationSec > 0 ? durationLabel(video.durationSec) : null,
+        video.sizeLabel ?? mb(video.sizeBytes),
+      ]
         .filter(Boolean)
         .join(' · ')
     : '';
@@ -55,7 +59,7 @@ export function VideoDialog({
         (playable ? (
           <video
             key={video.id}
-            src={video.objectUrl}
+            src={src}
             controls
             preload="metadata"
             onError={() => setFailedId(video.id)}
@@ -63,7 +67,7 @@ export function VideoDialog({
           />
         ) : (
           <p className="rounded-md bg-bg-3 px-4 py-6 text-center text-[13.5px] leading-[1.6] text-muted">
-            {video.objectUrl ? (
+            {src ? (
               <>
                 이 영상은 브라우저에서 미리 볼 수 없는 형식이에요.
                 <br />

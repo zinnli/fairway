@@ -1,0 +1,236 @@
+import type {
+  ActiveJob,
+  CaseDetail,
+  CaseEvents,
+  CaseService,
+  Session,
+  UploadResult,
+} from '../service';
+import type { Case, CaseSummary, VideoRef } from '@/domain/case';
+import type { ChatMessage } from '@/domain/message';
+import type { Rebuttal, Statement } from '@/domain/document';
+import type { Precedent, Verdict } from '@/domain/verdict';
+
+import * as authApi from './endpoints/auth';
+import * as casesApi from './endpoints/cases';
+import * as messagesApi from './endpoints/messages';
+import * as videosApi from './endpoints/videos';
+import * as verdictApi from './endpoints/verdict';
+import * as reportApi from './endpoints/report';
+import * as rebuttalApi from './endpoints/rebuttal';
+import { API_ORIGIN } from './client';
+import { setToken } from './tokens';
+import { subscribeCase } from './sse';
+import type { CaseDto, JobDto, SessionDto } from './dto';
+import {
+  toCase,
+  toCaseSummary,
+  toMessage,
+  toMessages,
+  toRebuttal,
+  toStatement,
+  toVerdict,
+  toVideoRef,
+} from './map';
+
+/**
+ * 서비스 계층 — endpoints(전송)와 map(변환)을 엮어 CaseService를 만든다.
+ * 여기서만 "무엇을 먼저 부르고 무엇을 이어 부르는지"를 안다.
+ * 경로 문자열도, DTO 필드 이름도 이 파일에는 없다.
+ */
+
+const toSession = (s: SessionDto): Session => {
+  setToken(s.accessToken);
+  return { ...s.user };
+};
+
+const toActiveJob = (job: JobDto | null): ActiveJob | null =>
+  job && (job.status === 'queued' || job.status === 'running') ? { kind: job.kind } : null;
+
+/** 현황판이 쓰는 값은 비율뿐이다. 근거까지 필요하면 E-1을 따로 부른다 */
+function caseWithRatio(c: CaseDto): Case {
+  if (!c.verdict) return toCase(c, null);
+  const ratio = { mine: c.verdict.ratio.mine, opponent: c.verdict.ratio.other };
+  const lite: Verdict = {
+    ratio,
+    conclusion: '',
+    chartName: '',
+    chartNo: null,
+    baseRatio: ratio,
+    adjustments: [],
+    precedents: [],
+    createdAt: c.updatedAt,
+  };
+  return toCase(c, lite);
+}
+
+export const httpService: CaseService = {
+  /* ── 인증 ─────────────────────────────────────────────── */
+
+  login: async (email, password) => toSession(await authApi.login({ email, password })),
+
+  signup: async (input) => toSession(await authApi.signup(input)),
+
+  logout: async () => {
+    await authApi.logout();
+    setToken(null);
+  },
+
+  /**
+   * 새로고침하면 액세스 토큰이 사라진다(메모리에만 두므로).
+   * refresh 쿠키로 한 번 되살려 보고, 안 되면 로그인 화면으로 보낸다.
+   */
+  restoreSession: async () => {
+    try {
+      const { accessToken } = await authApi.refresh();
+      setToken(accessToken);
+      const user = await authApi.me();
+      return { id: user.id, email: user.email, onboardedAt: user.onboardedAt, isDemo: user.isDemo };
+    } catch {
+      setToken(null);
+      return null;
+    }
+  },
+
+  completeOnboarding: async (skipped) => {
+    await authApi.completeOnboarding({ completed: !skipped, skipped });
+  },
+
+  /* ── 사건 ─────────────────────────────────────────────── */
+
+  listCases: async (): Promise<CaseSummary[]> => (await casesApi.list()).items.map(toCaseSummary),
+
+  getCase: async (caseId): Promise<CaseDetail> => {
+    const dto = await casesApi.get(caseId);
+    return { item: caseWithRatio(dto), activeJob: toActiveJob(dto.activeJob) };
+  },
+
+  createCase: async () => caseWithRatio(await casesApi.create()),
+
+  renameCase: async (caseId, title) => {
+    await casesApi.rename(caseId, title);
+  },
+
+  deleteCase: async (caseId) => {
+    await casesApi.remove(caseId);
+  },
+
+  /* ── 대화 ─────────────────────────────────────────────── */
+
+  listMessages: async (caseId): Promise<ChatMessage[]> =>
+    toMessages((await messagesApi.list(caseId, { limit: 50 })).items),
+
+  sendMessage: async (caseId, text) => {
+    const { message } = await messagesApi.send(caseId, text);
+    const mapped = toMessage(message);
+    if (!mapped) throw new Error(`화면이 모르는 카드예요: ${message.type}`);
+    return mapped;
+  },
+
+  uploadVideo: async (caseId, file, onProgress): Promise<UploadResult> => {
+    const res = await videosApi.uploadToCase(caseId, file, onProgress);
+    const video: VideoRef = {
+      id: res.video.id,
+      name: res.video.filename,
+      sizeBytes: res.video.sizeBytes,
+      sizeLabel: res.video.sizeLabel,
+      durationSec: res.video.durationSec,
+    };
+    return {
+      video,
+      needsDescription: res.needsDescription,
+      analysisStarted: res.analysis.started,
+    };
+  },
+
+  /** 재생 주소는 10분이면 만료된다 — 뷰어를 열 때마다 새로 받는다 */
+  getVideo: async (videoId) => {
+    const dto = await videosApi.get(videoId);
+    const video = toVideoRef(dto);
+    return { ...video, streamUrl: `${API_ORIGIN}${dto.streamUrl}` };
+  },
+
+  /* ── 판정 ─────────────────────────────────────────────── */
+
+  getVerdict: async (caseId): Promise<Verdict | null> => {
+    const { verdict } = await verdictApi.get(caseId);
+    return verdict ? toVerdict(verdict) : null;
+  },
+
+  getPrecedentText: async (caseId, precedent: Precedent) =>
+    (await verdictApi.precedent(precedent.no, caseId)).bodyText,
+
+  /* ── 사건경위서 ───────────────────────────────────────── */
+
+  /** 202만 온다. 초안 카드는 SSE로 들어온다 */
+  createStatement: async (caseId) => {
+    await reportApi.create(caseId);
+  },
+
+  reviseStatement: async (caseId, request) => {
+    await reportApi.revise(caseId, request);
+  },
+
+  getStatement: async (caseId): Promise<Statement> => toStatement(await reportApi.full(caseId)),
+
+  /**
+   * PDF는 서버가 만든다 — html2canvas로 그리지 않는다(한글이 이미지로 뭉개진다).
+   * 인증이 필요해서 링크로 바로 열지 못하고, 받아서 저장한다.
+   */
+  downloadStatementPdf: async (caseId, version) => {
+    const pdf = await reportApi.createPdf(caseId, version);
+    const res = await fetch(`${API_ORIGIN}${pdf.downloadUrl}`, { credentials: 'include' });
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = pdf.filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  },
+
+  /* ── 반박의견서 ───────────────────────────────────────── */
+
+  createRebuttal: async (caseId) => {
+    await rebuttalApi.create(caseId);
+  },
+
+  getRebuttal: async (caseId): Promise<Rebuttal> => toRebuttal(await rebuttalApi.get(caseId)),
+
+  updateRebuttal: async (caseId, patch) =>
+    toRebuttal(
+      await rebuttalApi.patch(caseId, {
+        ...(patch.to !== undefined ? { recipient: patch.to } : {}),
+        ...(patch.subject !== undefined ? { subject: patch.subject } : {}),
+        ...(patch.body !== undefined ? { body: patch.body } : {}),
+        ...(patch.attachments
+          ? { attachments: patch.attachments.map((a) => ({ refId: a.id, included: a.included })) }
+          : {}),
+      }),
+    ),
+
+  /** 실패하면 ApiError가 그대로 올라간다 — 화면은 서버가 준 title·message를 띄운다 */
+  sendRebuttal: async (caseId) => {
+    await rebuttalApi.send(caseId);
+  },
+
+  /* ── 실시간 ───────────────────────────────────────────── */
+
+  subscribe: (caseId, on: CaseEvents) =>
+    subscribeCase(caseId, {
+      messageCreated: (m) => {
+        const mapped = toMessage(m);
+        if (mapped) on.message?.(mapped);
+      },
+      messageUpdated: (m) => {
+        const mapped = toMessage(m);
+        if (mapped) on.messageUpdated?.(mapped);
+      },
+      caseUpdated: (c) => on.caseUpdated?.(caseWithRatio(c), toActiveJob(c.activeJob)),
+      rebuttalSent: (d) => on.rebuttalSent?.(d.sentAt, d.recipient),
+      lost: () => on.lost?.(),
+    }),
+};
+
+export { ApiError, NetworkError, isApiError } from './error';
+export { setSessionLostHandler } from './client';

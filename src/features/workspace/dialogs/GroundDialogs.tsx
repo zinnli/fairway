@@ -22,10 +22,13 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
 export function PrecedentDialog({
   open,
   precedent,
+  bodyText,
   onClose,
 }: {
   open: boolean;
   precedent: Precedent | null;
+  /** 사례마다 내용이 달라 서버가 글 한 덩이로 써 준다. 오기 전에는 아는 것만 보여 준다 */
+  bodyText?: string | null;
   onClose: () => void;
 }) {
   return (
@@ -40,7 +43,16 @@ export function PrecedentDialog({
         </Button>
       }
     >
-      {precedent && (
+      {precedent && bodyText ? (
+        <div className="flex flex-col gap-4">
+          {bodyText.split('\n\n').map((para) => (
+            <p key={para.slice(0, 24)} className="text-[15px] leading-[1.7] text-ink">
+              {para}
+            </p>
+          ))}
+        </div>
+      ) : null}
+      {precedent && !bodyText && (
         <div className="flex flex-col gap-5">
           <Line label="사고 개요">{precedent.summary}</Line>
           {precedent.isReversed && (
