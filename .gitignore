@@ -26,3 +26,8 @@ dist-ssr
 _to_delete
 
 .pnpm-store
+
+# Env
+.env
+.env.*
+!.env.example
