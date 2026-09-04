@@ -51,6 +51,8 @@ export function RebuttalDialog({
     setTouched(false);
   }
 
+  /* 서버가 빼 둔 첨부 — 왜 빠졌는지 사정이 함께 온다 (25MB 초과 등) */
+  const excluded = doc ? doc.attachments.filter((a) => !a.included && a.note) : [];
   const attachments = doc
     ? doc.attachments.filter((a) => a.included && !dropped.includes(a.id))
     : [];
@@ -174,6 +176,11 @@ export function RebuttalDialog({
               ))
             )}
           </div>
+          {excluded.map((a) => (
+            <p key={a.id} className="text-[12.5px] leading-[1.5] text-sand-text">
+              {a.label} — {a.note}
+            </p>
+          ))}
           <p className="text-[12.5px] leading-[1.5] text-muted">
             영상에는 상대 차량 번호판 등 다른 사람의 정보가 담길 수 있어요. 보험사 담당자에게만 보내
             주세요. ×를 누르면 빼고 보낼 수 있어요.

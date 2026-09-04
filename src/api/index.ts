@@ -19,5 +19,6 @@ export type {
   UploadResult,
 } from './service';
 export { ApiError, NetworkError, isApiError } from './http/error';
+export type { ApiErrorAction, ApiErrorBody } from './http/error';
 /** 401이 끝내 안 풀렸을 때 부를 곳을 라우터가 등록한다 */
 export { setSessionLostHandler } from './http/client';

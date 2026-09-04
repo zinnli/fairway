@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
-import { isApiError, service, type ActiveJob } from '@/api';
+import { isApiError, service, type ActiveJob, type ApiErrorAction } from '@/api';
 import { Drawer } from '@/components/ui/Drawer';
 import { PrintableStatement, StatementDialog } from '@/features/documents/StatementDialog';
 import { RebuttalDialog } from '@/features/documents/RebuttalDialog';
@@ -57,10 +57,14 @@ export function CaseWorkspacePage() {
   const [sending, setSending] = useState(false);
   /* 보내기 직전 한 번 더 묻는다 (h35) */
   const [confirmSend, setConfirmSend] = useState<Rebuttal | null>(null);
-  /* P-5 오류 — 9/3 축소 뒤 남은 실패 경로는 발송(h36) 하나뿐이다 */
-  const [failure, setFailure] = useState<{ title: string; hint: string; retry: () => void } | null>(
-    null,
-  );
+  /* P-5 오류 — 문구도 단추도 서버가 정한다 (명세 §2.3) */
+  const [failure, setFailure] = useState<{
+    title: string;
+    hint: string;
+    retryable: boolean;
+    actions: ApiErrorAction[];
+    retry: () => void;
+  } | null>(null);
   /* F01 영상 뷰어 */
   const [playing, setPlaying] = useState<VideoRef | null>(null);
   /* 경위서 전문. 카드에는 미리보기만 있어서 열 때 받아 둔다.
@@ -202,6 +206,30 @@ export function CaseWorkspacePage() {
   }, [caseId, viewKey]);
 
   /**
+   * 서버가 준 실패를 그대로 화면에 옮긴다. 문구를 새로 만들지 않는다.
+   * 규격 밖 실패(연결 끊김 등)에만 우리 문장을 쓴다.
+   */
+  const showFailure = useCallback((e: unknown, retry: () => void) => {
+    setFailure(
+      isApiError(e)
+        ? {
+            title: e.body.title,
+            hint: e.body.message,
+            retryable: e.body.retryable,
+            actions: e.body.actions,
+            retry,
+          }
+        : {
+            title: '문제가 생겼어요',
+            hint: '연결이 끊겼어요. 잠시 후 다시 시도해 주세요.',
+            retryable: true,
+            actions: [],
+            retry,
+          },
+    );
+  }, []);
+
+  /**
    * 서류 만들기 — 셋 다 "청하고 끝"이다. 202만 오고 **카드는 이벤트로 들어온다.**
    * 도는 동안은 activeJob이 서 있어서 단추가 잠긴다.
    */
@@ -211,8 +239,12 @@ export function CaseWorkspacePage() {
       void openStatement();
       return;
     }
-    await service.createStatement(caseId);
-  }, [caseId, openStatement]);
+    try {
+      await service.createStatement(caseId);
+    } catch (e) {
+      showFailure(e, () => void service.createStatement(caseId));
+    }
+  }, [caseId, openStatement, showFailure]);
 
   /* 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드가 아래에 붙는다 */
   const rewriteStatement = useCallback(
@@ -223,8 +255,13 @@ export function CaseWorkspacePage() {
   );
 
   const createRebuttal = useCallback(async () => {
-    await service.createRebuttal(caseId);
-  }, [caseId]);
+    try {
+      await service.createRebuttal(caseId);
+    } catch (e) {
+      /* 잠겨 있으면 서버가 [사건경위서 먼저 만들기]까지 지정해 준다 (G-1) */
+      showFailure(e, () => void service.createRebuttal(caseId));
+    }
+  }, [caseId, showFailure]);
 
   const sendRebuttal = useCallback(
     async (draft: Rebuttal) => {
@@ -237,23 +274,16 @@ export function CaseWorkspacePage() {
         setDrawer(null);
         await refresh();
       } catch (e) {
-        /* 남은 실패 경로는 발송(h36) 하나뿐이다. 서버가 문장을 주면 그대로 쓴다 */
-        setFailure({
-          title: isApiError(e) ? e.body.title : '보내지 못했어요',
-          hint: isApiError(e)
-            ? e.body.message
-            : '메일 서버가 응답하지 않았어요. 작성한 내용과 첨부는 그대로 있으니, 잠시 후 다시 시도해 주세요.',
-          /* 쓴 내용은 그대로 두고 확인 창으로 돌려보낸다 (h36) */
-          retry: () => {
-            setFailure(null);
-            setConfirmSend(draft);
-          },
+        /* 쓴 내용과 첨부는 그대로 두고 확인 창으로 돌려보낸다 (h36) */
+        showFailure(e, () => {
+          setFailure(null);
+          setConfirmSend(draft);
         });
       } finally {
         setSending(false);
       }
     },
-    [caseId, refresh],
+    [caseId, refresh, showFailure],
   );
 
   /**
@@ -591,8 +621,17 @@ export function CaseWorkspacePage() {
         open={failure !== null}
         title={failure?.title ?? ''}
         hint={failure?.hint ?? ''}
+        retryable={failure?.retryable}
+        actions={failure?.actions}
         onClose={() => setFailure(null)}
         onRetry={() => failure?.retry()}
+        onAction={(action) => {
+          setFailure(null);
+          if (action.type === 'retry_send') failure?.retry();
+          if (action.type === 'create_report') void createStatement();
+          if (action.type === 'go_case_list') navigate('/cases');
+          if (action.type === 'go_login' || action.type === 'go_password_reset') navigate('/login');
+        }}
       />
 
       <Drawer
