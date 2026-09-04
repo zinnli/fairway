@@ -5,7 +5,7 @@ import { buttonClass } from '@/components/ui/Button';
 import { Disclaimer } from '@/components/ui/Disclaimer';
 import { Icon } from '@/components/ui/Icon';
 import { RatioBar } from '@/components/ui/RatioBar';
-import { diffPoints, formatRatio, type Ratio } from '@/domain/verdict';
+import { formatRatio, type Ratio } from '@/domain/verdict';
 
 /**
  * H01 S0 첫 화면 (PC) · M01 첫 화면 (모바일).
@@ -14,7 +14,6 @@ import { diffPoints, formatRatio, type Ratio } from '@/domain/verdict';
  * 카드에 보이는 숫자는 시연용 예시다. 실제 판정이 아니므로 store를 타지 않는다.
  */
 
-const CLAIM: Ratio = { mine: 40, opponent: 60 };
 const VERDICT: Ratio = { mine: 20, opponent: 80 };
 
 /** 인정기준 도표 번호는 미확정이라 이름만 쓴다 (00 문서 5절) */
@@ -39,16 +38,6 @@ const POINTS = [
   },
   { strong: '서류까지', rest: '경위서와 반박의견서를 만들어 보내요' },
 ] as const;
-
-/** 흰 배경 · 테두리 · 6px 색점 하나. 부품 규격이라 색점은 4배수 예외 */
-function EvidenceChip() {
-  return (
-    <span className="box-border inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2">
-      <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-brand" aria-hidden />
-      근거 3건
-    </span>
-  );
-}
 
 function Header() {
   return (
@@ -106,7 +95,6 @@ function DesktopBody() {
                 <Icon name="shield" size={16} />
               </span>
               <span className="flex-1 text-[12.5px] font-semibold text-ink-3">예상 과실비율</span>
-              <EvidenceChip />
             </div>
 
             <div
@@ -132,7 +120,6 @@ function DesktopBody() {
             </div>
 
             <div className="flex flex-col gap-2">
-              <RatioBar label="상대 보험사 주장" ratio={CLAIM} />
               <RatioBar label={`${APP_NAME} 판정`} ratio={VERDICT} emphasis />
             </div>
 
@@ -151,9 +138,6 @@ function DesktopBody() {
                   <Icon name="file" size={13} />
                 </span>
                 <span className="flex-1">{PRECEDENT_NO}</span>
-                <span className="tnum box-border rounded-full border border-line bg-surface px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2">
-                  95% 일치
-                </span>
                 <span className="flex text-muted" aria-hidden>
                   <Icon name="chevronRight" size={12} />
                 </span>
@@ -193,8 +177,6 @@ function DesktopBody() {
 /* ── 모바일 375 시안 (m01) ─────────────────────────────────────── */
 
 function MobileBody() {
-  const gap = diffPoints(CLAIM, VERDICT);
-
   return (
     <div className="flex min-h-0 flex-1 flex-col sm:hidden">
       <div className="flex min-w-0 flex-1 flex-col justify-center gap-4 px-4">
@@ -215,10 +197,7 @@ function MobileBody() {
         </p>
 
         <div className="mt-1 flex flex-col gap-2 rounded-lg border border-line-2 bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)]">
-          <div className="flex items-center justify-between">
-            <span className="text-[12px] font-semibold text-muted">예상 과실비율</span>
-            <EvidenceChip />
-          </div>
+          <span className="text-[12px] font-semibold text-muted">예상 과실비율</span>
           <p
             className="tnum text-[26px] font-bold tracking-[-0.02em] text-ink"
             aria-label={formatRatio(VERDICT)}
@@ -226,12 +205,7 @@ function MobileBody() {
             나 {VERDICT.mine} <span className="font-normal text-muted">:</span> 상대{' '}
             {VERDICT.opponent}
           </p>
-          <RatioBar label="상대 보험사 주장" ratio={CLAIM} />
           <RatioBar label={`${APP_NAME} 판정`} ratio={VERDICT} emphasis />
-          <p className="flex items-center gap-1 text-[12.5px] font-semibold text-teal-text">
-            <Icon name="arrowDown" size={12} strokeWidth={2} />
-            상대 주장보다 내 과실이 {gap}%p 낮아요
-          </p>
         </div>
 
         <ul className="mt-1 flex flex-col gap-2">

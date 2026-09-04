@@ -7,7 +7,6 @@ const DOT: Record<CaseStatus, string> = {
   '분석중': 'bg-brand',
   '확인 필요': 'bg-sand',
   '판정 완료': 'bg-teal',
-  '재판정중': 'bg-brand',
   '발송 완료': 'bg-teal',
   '종결': 'bg-disabled',
 };

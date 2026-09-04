@@ -74,18 +74,9 @@ export function VerdictMock() {
         </span>
       </p>
       <div className="flex flex-col gap-1 rounded-md border border-brand-line p-2">
-        <p className="flex items-center gap-1">
-          <span className="min-w-0 flex-1 text-[12.5px] text-ink">
-            인정기준 도표 — 신호기 있는 교차로 · 신호위반
-          </span>
-          <span className="text-[12px] font-medium text-brand">보기</span>
-        </p>
-        <p className="flex items-center gap-1">
-          <span className="min-w-0 flex-1 text-[12.5px] text-ink">
-            심의사례 2019-018856 · 신호위반 직진 충돌
-          </span>
-          <span className="text-[12px] text-muted">95% 일치</span>
-        </p>
+        {/* 도표 팝업(h38)과 일치도(%)는 9/3에 빠졌다 — 근거는 글로만 늘어놓는다 */}
+        <p className="text-[12.5px] text-ink">인정기준 도표 — 신호기 있는 교차로 · 신호위반</p>
+        <p className="text-[12.5px] text-ink">심의사례 2019-018856 · 신호위반 직진 충돌</p>
       </div>
     </div>
   );

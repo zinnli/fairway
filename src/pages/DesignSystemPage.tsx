@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { APP_NAME } from '@/config';
 import { Button } from '@/components/ui/Button';
-import { SelectChip, SourceChip } from '@/components/ui/Chip';
 import { StatusBadge } from '@/components/ui/Badge';
 import { RatioBar } from '@/components/ui/RatioBar';
 import { StepDots } from '@/components/ui/StepDots';
@@ -10,7 +9,6 @@ import { Disclaimer } from '@/components/ui/Disclaimer';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
 import { STAGE_LABELS, type CaseStatus, type StageState } from '@/domain/case';
-import { factCountLabel, type Fact } from '@/domain/fact';
 
 const ICONS: IconName[] = [
   'shield', 'chevronRight', 'chevronDown', 'chevronUp', 'plus', 'close', 'check', 'checkSmall',
@@ -18,17 +16,8 @@ const ICONS: IconName[] = [
   'paperclip', 'file', 'logout', 'retry', 'video', 'send', 'scale', 'clock', 'checkCircle', 'more',
 ];
 
-const STATUSES: CaseStatus[] = ['접수중', '분석중', '확인 필요', '판정 완료', '재판정중', '발송 완료', '종결'];
+const STATUSES: CaseStatus[] = ['접수중', '분석중', '확인 필요', '판정 완료', '발송 완료', '종결'];
 const STATES: StageState[] = ['대기', '진행중', '완료'];
-
-const SAMPLE_FACTS: Fact[] = [
-  { key: 'myLane', value: '1차로 직진', source: 'video' },
-  { key: 'opponentEntry', value: '좌측에서 진입', source: 'video' },
-  { key: 'opponentSignal', value: '적색', source: 'video' },
-  { key: 'mySpeed', value: '약 45km/h', source: 'video' },
-  { key: 'impactPoint', value: '우측 앞펜더', source: 'statement' },
-  { key: 'stopLineTiming', value: null, source: 'unknown', isDisputed: true },
-];
 
 function Section({ title, note, children }: { title: string; note?: string; children: React.ReactNode }) {
   return (
@@ -43,7 +32,6 @@ function Section({ title, note, children }: { title: string; note?: string; chil
 }
 
 export function DesignSystemPage() {
-  const [chip, setChip] = useState('우측 앞펜더');
   const [open, setOpen] = useState(false);
 
   return (
@@ -94,21 +82,9 @@ export function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="3. 칩과 배지">
-        <div className="flex flex-wrap gap-2">
-          <SourceChip source="video" />
-          <SourceChip source="statement" />
-          <SourceChip source="unknown" />
-        </div>
+      <Section title="3. 상태 배지" note="출처 칩·선택 칩은 9/3 축소로 빠졌습니다 (04 문서 C2·C7).">
         <div className="flex flex-wrap gap-2">
           {STATUSES.map((s) => <StatusBadge key={s} status={s} />)}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {['앞범퍼', '우측 앞펜더', '우측 뒷문', '뒷범퍼', '잘 모르겠어요'].map((label) => (
-            <SelectChip key={label} selected={chip === label} onClick={() => setChip(label)}>
-              {label}
-            </SelectChip>
-          ))}
         </div>
       </Section>
 
@@ -125,13 +101,12 @@ export function DesignSystemPage() {
           </div>
         </div>
         <div className="flex max-w-[560px] flex-col gap-2">
-          <RatioBar label="상대 보험사 주장" ratio={{ mine: 30, opponent: 70 }} />
           <RatioBar label={`${APP_NAME} 판정`} ratio={{ mine: 0, opponent: 100 }} emphasis />
         </div>
         <Disclaimer />
       </Section>
 
-      <Section title="5. 진행 단계와 사실 카운트">
+      <Section title="5. 진행 단계">
         <div className="flex flex-wrap gap-6">
           {STATES.map((state) => (
             <div key={state} className="flex items-center gap-2">
@@ -148,11 +123,10 @@ export function DesignSystemPage() {
             </div>
           ))}
         </div>
-        <p className="text-[13.5px] text-ink-3">{factCountLabel(SAMPLE_FACTS)}</p>
-        <StepDots step={3} steps={6} label="접수 3단계 중 3단계" />
+        <StepDots step={3} steps={4} label="진행 상황 — 전체 4단계 중 3단계" />
       </Section>
 
-      <Section title="6. 아이콘" note="10_디자인.html에서 추출한 26종. 20×20 · 1.5px · currentColor.">
+      <Section title="7. 아이콘" note="10_디자인.html에서 추출한 26종. 20×20 · 1.5px · currentColor.">
         <div className="flex flex-wrap gap-2">
           {ICONS.map((name) => (
             <div key={name} className="flex h-22 w-22 flex-col items-center justify-center gap-2 rounded-md border border-line-2">
@@ -163,20 +137,18 @@ export function DesignSystemPage() {
         </div>
       </Section>
 
-      <Section title="7. 팝업" note="네이티브 dialog — 포커스 트랩·Esc·스크롤 잠금이 기본으로 옵니다.">
+      <Section title="6. 팝업" note="네이티브 dialog — 포커스 트랩·Esc·스크롤 잠금이 기본으로 옵니다.">
         <div>
-          <Button variant="secondary" onClick={() => setOpen(true)}>도표 팝업 열기</Button>
+          <Button variant="secondary" onClick={() => setOpen(true)}>심의사례 팝업 열기</Button>
         </div>
         <Dialog
           open={open}
           onClose={() => setOpen(false)}
-          title="인정기준 도표"
+          title="심의사례 2019-018856"
           footer={<Button onClick={() => setOpen(false)}>확인</Button>}
         >
           <p className="text-[15px] leading-relaxed">
-            신호기에 의해 교통정리가 이루어지고 있는 교차로에서의 사고. 도표 번호는 AI 담당이 확정하면
-            <code className="mx-1 rounded bg-bg-2 px-1 text-[13px]">chartNo</code>
-            한 필드만 채우면 다섯 화면에 동시에 들어갑니다.
+            신호위반 직진 충돌. 일치도(%)는 9/3 축소로 빼고 내용만 글로 보여 줍니다.
           </p>
         </Dialog>
       </Section>

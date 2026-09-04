@@ -5,7 +5,6 @@ import { StageIcon } from '@/components/ui/StageIcon';
 import { STAGE_LABELS, type Case } from '@/domain/case';
 import type { Rebuttal, Statement } from '@/domain/document';
 import { versionLabel } from '@/lib/document';
-import { FACT_SOURCE_LABEL, factCountLabel, type Fact, type FactSource } from '@/domain/fact';
 import { formatRatio } from '@/domain/verdict';
 import { cn } from '@/lib/cn';
 
@@ -14,33 +13,11 @@ import { cn } from '@/lib/cn';
  * 폭 340 고정. 1280 미만에서는 접히는데, 768 이상은 오른쪽 서랍이고 그 아래는
  * 아래에서 올라오는 시트다(m09). 껍데기는 작업 화면이 씌운다.
  *
- * 확인된 사실 개수는 저장하지 않고 factCountLabel()로 파생한다.
+ * 9/3 축소로 "확인된 사실"·"영상에서 찾은 사실" 묶음과 [변경 이력 보기]가 빠졌다
+ * (04 문서 C2·C3). 남는 것은 예상 과실비율 · 진행 단계 · 서류 세 덩이다.
  */
 
-const DOT: Record<FactSource, string> = {
-  video: 'bg-brand',
-  statement: 'bg-teal',
-  unknown: 'bg-sand',
-};
-
-/** 사실 칩 — 출처는 6px 색점으로만 말한다. 색점은 부품 규격이라 4배수 예외 */
-function FactChip({ fact }: { fact: Fact }) {
-  const text = fact.value ?? `${FACT_SOURCE_LABEL.unknown}`;
-  return (
-    <span
-      className={cn(
-        'box-border inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-1',
-        'text-[12px] leading-[1.35] font-medium',
-        fact.source === 'unknown' ? 'text-sand-text' : 'text-ink-2',
-      )}
-    >
-      <span className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT[fact.source])} aria-hidden />
-      {text}
-    </span>
-  );
-}
-
-function SectionTitle({ icon, children }: { icon: 'clock' | 'checkCircle' | 'file'; children: React.ReactNode }) {
+function SectionTitle({ icon, children }: { icon: 'clock' | 'file'; children: React.ReactNode }) {
   return (
     <p className="flex items-center gap-1 text-[12px] font-semibold text-muted">
       <Icon name={icon} size={14} />
@@ -90,10 +67,8 @@ export function StatusPanel({
   statement,
   rebuttal,
   showDisclaimer,
-  onEditFacts,
   onOpenStatement,
   onOpenRebuttal,
-  onOpenHistory,
 }: {
   item: Case;
   /** 지금까지 만들어진 서류. 없으면 "만들기"가 되고, 만들 수도 없으면 잠긴다 */
@@ -103,9 +78,6 @@ export function StatusPanel({
   showDisclaimer: boolean;
   onOpenStatement: () => void;
   onOpenRebuttal: () => void;
-  onOpenHistory: () => void;
-  /** 확인된 사실 옆 [고치기] — 대화에 사실 카드를 한 장 더 붙인다 (h23) */
-  onEditFacts: () => void;
 }) {
   const ratio = item.verdict?.ratio ?? null;
 
@@ -117,14 +89,15 @@ export function StatusPanel({
       ? { value: '아직 없음 · 눌러서 만들기', locked: false }
       : { value: '잠김 · 판정이 먼저예요', locked: true };
 
-  const rebuttalRow = rebuttal
-    ? {
-        value: rebuttal.sentAt ? '발송 완료' : '보낼 수 있어요',
-        locked: false,
-      }
-    : statement
-      ? { value: '이제 만들 수 있어요', locked: false }
-      : { value: '잠김 · 판정과 경위서가 먼저예요', locked: true };
+  /* 보낸 뒤에는 초안의 sentAt이 아니라 단계를 본다 — 초안은 보내기 전 모습 그대로다 (4.4) */
+  const sent = item.stages.rebuttal === '완료';
+  const rebuttalRow = sent
+    ? { value: '발송 완료', locked: false }
+    : rebuttal
+      ? { value: '보낼 수 있어요', locked: false }
+      : statement
+        ? { value: '이제 만들 수 있어요', locked: false }
+        : { value: '잠김 · 판정과 경위서가 먼저예요', locked: true };
 
   return (
     <div className="flex h-full w-full shrink-0 flex-col overflow-hidden border-line bg-bg sm:w-85 sm:border-l">
@@ -172,45 +145,6 @@ export function StatusPanel({
           })}
         </div>
 
-        <div className="flex flex-col gap-2">
-          <div className="flex items-center gap-2">
-            <SectionTitle icon="checkCircle">
-              {item.facts.length > 0 ? factCountLabel(item.facts) : '확인된 사실'}
-            </SectionTitle>
-            {item.facts.length > 0 && (
-              <button
-                type="button"
-                onClick={onEditFacts}
-                className="-my-1 ml-auto flex min-h-11 shrink-0 items-center rounded-sm px-2 text-[12.5px] font-medium text-brand-press hover:bg-bg-2 sm:min-h-8"
-              >
-                고치기
-              </button>
-            )}
-          </div>
-          {item.facts.length === 0 ? (
-            <p className="text-[13.5px] text-muted">영상을 올리면 여기에 쌓여요.</p>
-          ) : (
-            <>
-              <div className="flex items-center gap-3 text-[12px] leading-[1.35] text-muted">
-                {(['video', 'statement', 'unknown'] as FactSource[]).map((source) => (
-                  <span key={source} className="inline-flex items-center gap-1">
-                    <span
-                      className={cn('h-1.5 w-1.5 shrink-0 rounded-full', DOT[source])}
-                      aria-hidden
-                    />
-                    {source === 'statement' ? '내가 말함' : FACT_SOURCE_LABEL[source]}
-                  </span>
-                ))}
-              </div>
-              <div className="flex flex-wrap gap-1">
-                {item.facts.map((fact) => (
-                  <FactChip key={fact.key} fact={fact} />
-                ))}
-              </div>
-            </>
-          )}
-        </div>
-
         <div className="flex flex-col gap-1">
           <SectionTitle icon="file">서류</SectionTitle>
           <DocRow
@@ -226,15 +160,6 @@ export function StatusPanel({
             onOpen={onOpenRebuttal}
           />
         </div>
-
-        <button
-          type="button"
-          onClick={onOpenHistory}
-          className="-mx-2 flex min-h-11 items-center gap-1 self-start rounded-sm px-2 text-[13.5px] text-ink-3 hover:bg-bg-2 sm:min-h-8"
-        >
-          <Icon name="retry" size={14} />
-          변경 이력 보기
-        </button>
       </div>
 
       {showDisclaimer && (

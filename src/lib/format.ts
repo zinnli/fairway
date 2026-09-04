@@ -16,14 +16,3 @@ export function durationLabel(sec: number): string {
   const rest = total % 60;
   return rest === 0 ? `${m}분` : `${m}분 ${rest}초`;
 }
-
-/**
- * 한글 조사 붙이기 — 받침이 있으면 앞의 것, 없으면 뒤의 것.
- * "정지선 통과 시점은(는)" 같은 표기를 화면에 내보내지 않으려고 둔다.
- */
-export function particle(word: string, withBatchim: string, withoutBatchim: string): string {
-  const last = word.trim().slice(-1).charCodeAt(0);
-  const isHangul = last >= 0xac00 && last <= 0xd7a3;
-  if (!isHangul) return withoutBatchim;
-  return (last - 0xac00) % 28 === 0 ? withoutBatchim : withBatchim;
-}

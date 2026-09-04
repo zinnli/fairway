@@ -33,13 +33,11 @@ export function CaseRow({
   selected,
   onRename,
   onDelete,
-  onHistory,
 }: {
   item: CaseSummary;
   selected: boolean;
   onRename: (title: string) => void;
   onDelete: () => void;
-  onHistory: () => void;
 }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [flipped, setFlipped] = useState(false);
@@ -197,17 +195,6 @@ export function CaseRow({
               className="flex min-h-11 w-full items-center px-4 py-3 text-[13.5px] text-ink hover:bg-bg"
             >
               이름 바꾸기
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                onHistory();
-                setAnchor(null);
-              }}
-              className="flex min-h-11 w-full items-center px-4 py-3 text-[13.5px] text-ink hover:bg-bg"
-            >
-              변경 이력
             </button>
             <button
               type="button"

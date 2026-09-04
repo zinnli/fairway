@@ -3,7 +3,7 @@ import { Dialog } from '@/components/ui/Dialog';
 import type { Rebuttal } from '@/domain/document';
 
 /**
- * P-5 오류 공용 틀 — h32(PDF 실패) · h36(발송 실패).
+ * P-5 오류 — 9/3 축소 뒤 남은 실패 경로는 발송(h36) 하나뿐이다.
  * 규칙 0.7: 무엇이 안 됐는지 + 어떻게 하면 되는지 + [다시 시도]가 늘 같이 온다.
  */
 export function ErrorDialog({
@@ -44,14 +44,12 @@ export function ErrorDialog({
 export function SendConfirmDialog({
   open,
   draft,
-  unknownNote,
   sending,
   onBack,
   onSend,
 }: {
   open: boolean;
   draft: Rebuttal | null;
-  unknownNote: string | null;
   sending?: boolean;
   onBack: () => void;
   onSend: () => void;
@@ -92,14 +90,6 @@ export function SendConfirmDialog({
               {attached.length}개{attached.length > 0 && ` — ${attached.map((a) => a.label).join(' · ')}`}
             </span>
           </p>
-
-          {unknownNote && (
-            <p className="flex items-start gap-2 rounded-md border border-line bg-surface px-4 py-3 text-[13.5px] text-sand-text">
-              {/* 6px 색점 — 부품 규격이라 4배수 예외 */}
-              <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sand" aria-hidden />
-              <span className="min-w-0">{unknownNote}</span>
-            </p>
-          )}
 
           <p className="text-[13.5px] font-medium text-danger">보낸 뒤에는 취소할 수 없어요.</p>
         </div>

@@ -67,7 +67,6 @@ export function Sidebar({
               selected={item.id === selectedId}
               onRename={(title) => void rename(item.id, title)}
               onDelete={() => setDeleteTarget(item.id)}
-              onHistory={() => navigate(`/cases/${item.id}?panel=history`)}
             />
           ))}
         </div>
