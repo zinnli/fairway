@@ -22,10 +22,9 @@ export const VIDEO_LIMITS = {
  * 파일은 `public/sample/`에 둔다. Vite가 손대지 않고 그대로 복사하므로 번들에 섞이지 않는다.
  * null로 두면 [예시 영상으로 해보기] 버튼이 화면에서 사라진다 — 파일이 아직 없으면 null.
  */
-export const SAMPLE_VIDEO: { url: string; name: string } | null = {
-  url: '/sample/blackbox-sample.mp4',
-  name: 'blackbox_sample.mp4',
-};
+export const SAMPLE_VIDEO: { url: string; name: string } | null = null;
+// 파일을 public/sample/에 넣는 날 아래로 되돌린다 (예시 영상은 별도 이슈)
+// { url: '/sample/blackbox-sample.mp4', name: 'blackbox_sample.mp4' };
 
 /** ★ 메일 실제 발송 여부 (02 기능명세서 4.3). 시연은 모의 발송 */
 export const EMAIL_MODE: 'mock' | 'real' = 'mock';
