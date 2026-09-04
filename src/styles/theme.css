@@ -140,10 +140,22 @@
     section { break-inside: avoid; }
   }
 
-  /* 카드 등장 — 150ms, 아래→위 8px. 이것 말고 다른 움직임은 없다 */
+  /* 카드 등장 — 150ms, 아래→위 8px */
   .anim-rise { animation: rise 150ms ease-out both; }
   @keyframes rise {
     from { opacity: 0; transform: translateY(8px); }
     to   { opacity: 1; transform: none; }
+  }
+
+  /* 분석 중 점 깜빡임 — 카드 등장과 함께 허용된 단 두 가지 움직임이다 (00 문서 6절) */
+  .anim-blink { animation: blink 1.2s ease-in-out infinite; }
+  @keyframes blink {
+    0%, 80%, 100% { opacity: 0.25; }
+    40%           { opacity: 1; }
+  }
+
+  /* "움직임 줄이기"를 켠 사람에게는 둘 다 끈다 */
+  @media (prefers-reduced-motion: reduce) {
+    .anim-rise, .anim-blink { animation: none; }
   }
 }

@@ -1,25 +1,16 @@
 import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { api } from '@/api';
-import { toApiError } from '@/api/error';
 import { Drawer } from '@/components/ui/Drawer';
 import { PrintableStatement, StatementDialog } from '@/features/documents/StatementDialog';
 import { RebuttalDialog } from '@/features/documents/RebuttalDialog';
-import {
-  ChartDialog,
-  HistoryDialog,
-  PrecedentDialog,
-  ProcessDialog,
-} from '@/features/workspace/dialogs/GroundDialogs';
+import { PrecedentDialog, ProcessDialog } from '@/features/workspace/dialogs/GroundDialogs';
 import { ErrorDialog, SendConfirmDialog } from '@/features/workspace/dialogs/AlertDialogs';
 import { VideoDialog } from '@/features/workspace/dialogs/VideoDialog';
-import { VIDEO_LIMITS } from '@/config';
-import { ANALYZE_STEPS } from '@/domain/analysis';
-import { FACT_LABEL, type Fact, type FactKey } from '@/domain/fact';
-import { FACT_QUESTIONS } from '@/domain/questions';
+import { SAMPLE_VIDEO, VIDEO_LIMITS } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
-import type { ChatMessage, Chip, MessageBody } from '@/domain/message';
-import type { Precedent, Ratio } from '@/domain/verdict';
+import type { ChatMessage, MessageBody } from '@/domain/message';
+import type { Precedent } from '@/domain/verdict';
 import type { Case, VideoRef } from '@/domain/case';
 import { Sidebar } from '@/features/cases/Sidebar';
 import { ChatHeader } from '@/features/workspace/ChatHeader';
@@ -27,18 +18,20 @@ import { Composer } from '@/features/workspace/Composer';
 import { MobileBar } from '@/features/workspace/MobileBar';
 import { StatusPanel } from '@/features/workspace/StatusPanel';
 import { MessageItem } from '@/features/workspace/messages/MessageItem';
-import { particle } from '@/lib/format';
 import { chatReducer, emptyChat } from '@/store/chatReducer';
 import { useCaseStore } from '@/store/caseStore';
 
 /**
- * S4 작업 화면 — 라우트 하나가 h12~h39 + f01~f04 + m05~m13을 흡수한다.
- * 화면이 40장인 게 아니라, 같은 셸 안에서 대화에 카드가 하나씩 더 붙는 것뿐이다.
+ * S4 작업 화면 — 라우트 하나가 h12~h37 + f01·f03·f04 + m05~m13을 흡수한다.
+ * 화면이 여러 장인 게 아니라, 같은 셸 안에서 대화에 카드가 하나씩 더 붙는 것뿐이다.
  *
  * 왼쪽 HiSidebar(26화면 공유) · 가운데 대화 · 오른쪽 HiStatus(25화면 공유).
  * 폭 규칙은 시안 h09 주석 그대로다 — 1280 이상 둘 다 고정 / 1024~1280 현황판만 서랍 /
  * 1024 미만 둘 다 서랍. 서랍을 여는 단추는 대화 위 띠에 둔다.
- * (시안은 "머리글에" 두라고 하지만, 우리 머리글은 대화와 같이 스크롤돼서 밀려 올라간다)
+ *
+ * 9/3 축소 뒤 흐름은 한 줄기다:
+ *   영상 → 분석(로딩) → 요약 글 → 글로 되묻기 → 판정 → 서류 → 발송.
+ * 사실 고치기·재판정·상대 주장·변경 이력처럼 되돌아가는 길은 없다 (04 문서).
  */
 let seq = 0;
 const nextId = () => `m${++seq}`;
@@ -61,58 +54,57 @@ export function CaseWorkspacePage() {
     which: 'cases' | 'status' | 'statement' | 'rebuttal';
   } | null>(null);
   const openDrawer = drawer?.key === viewKey ? drawer.which : null;
-  /* 팝업 4종도 같은 규칙을 쓴다 */
-  const [rewriting, setRewriting] = useState(false);
   const [sending, setSending] = useState(false);
   /* 보내기 직전 한 번 더 묻는다 (h35) */
   const [confirmSend, setConfirmSend] = useState<Rebuttal | null>(null);
-  /* P-5 오류 공용 틀 — PDF 실패(h32) · 발송 실패(h36) */
+  /* P-5 오류 — 9/3 축소 뒤 남은 실패 경로는 발송(h36) 하나뿐이다 */
   const [failure, setFailure] = useState<{ title: string; hint: string; retry: () => void } | null>(
     null,
   );
   /* F01 영상 뷰어 */
   const [playing, setPlaying] = useState<VideoRef | null>(null);
+  /* 팝업 2종도 서랍과 같은 규칙을 쓴다 */
   const [popup, setPopup] = useState<{
     key: string;
-    which: 'chart' | 'precedent' | 'history' | 'process';
+    which: 'precedent' | 'process';
     precedent?: Precedent;
   } | null>(null);
   const openPopup = popup?.key === viewKey ? popup.which : null;
   const show = (which: 'cases' | 'status' | 'statement' | 'rebuttal') =>
     setDrawer({ key: viewKey, which });
-  const pop = (which: 'chart' | 'precedent' | 'history' | 'process', precedent?: Precedent) =>
+  const pop = (which: 'precedent' | 'process', precedent?: Precedent) =>
     setPopup({ key: viewKey, which, precedent });
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
   const pickVideo = () => fileRef.current?.click();
 
   const reloadList = useCaseStore((s) => s.load);
-  /* 업로드 취소와 분석 멈추기는 진행 중인 것 하나씩만 있다 */
-  const uploadAbort = useRef<AbortController | null>(null);
-  const analyzeStopped = useRef(false);
   const analyzing = useRef(false);
-  /* 지금 도는 분석 카드 — 멈출 때 그 카드를 끝난 모양으로 바꿔야 한다 */
-  const analyzingCard = useRef<string | null>(null);
-  /* 콜백 안에서 최신 대화·사건을 봐야 해서 거울을 하나씩 둔다 */
+  /* 콜백 안에서 최신 대화를 봐야 해서 거울을 하나 둔다 */
   const messagesRef = useRef(chat.messages);
-  const itemRef = useRef<Case | null>(null);
-  /* 보기 없이 되물은 항목 — 다음에 치는 글이 그 항목의 답이 된다 */
-  const pendingFact = useRef<FactKey | null>(null);
+  /* AI가 되물어 놓은 상태인가. 그렇다면 다음에 치는 글이 그 질문의 답이다 */
+  const awaiting = useRef(false);
   /* 콜백 안에서 지금 서류가 있는지 봐야 한다 */
   const statementRef = useRef<Statement | null>(null);
   /* 지금 보고 있는 사건. 업로드·분석이 도는 동안 사건을 바꾸면
      끝난 결과가 남의 대화에 붙는다 — 그걸 막는 문지기다 */
   const activeCase = useRef(caseId);
+  /* 예시 영상을 받아 오는 중. 연타로 두 번 올라가는 것을 막는다 */
+  const fetchingSample = useRef(false);
+  /* 경위서를 다시 쓰는 중. 진행 화면(h31)이 없어서 단추 잠금으로만 알린다 */
+  const [rewriting, setRewriting] = useState(false);
 
-  /* 목이 사건을 고친 뒤에는 현황판과 사이드바를 다시 읽어야 한다 */
+  /* 목이 사건을 고친 뒤에는 현황판과 사이드바를 다시 읽어야 한다.
+     방금 읽은 사건을 돌려준다 — 상태가 화면에 반영되기 전에 판단해야 할 때가 있다 */
   const refresh = useCallback(async () => {
     const fresh = await api.getCase(caseId);
     setLoaded({ id: caseId, item: fresh });
     void reloadList();
+    return fresh;
   }, [caseId, reloadList]);
 
-  /* 화면이 만든 카드를 대화에도 쌓고 로그에도 남긴다.
-     지나가는 카드(업로드 중·분석 중·오류)는 keep을 끄고 화면에만 둔다 */
+  /* 화면이 만든 카드를 대화에 쌓는다.
+     keep을 켜면 로그에도 남긴다 — 목이 이미 로그에 넣은 카드는 꺼 둬야 두 번 쌓이지 않는다 */
   const say = useCallback(
     (body: MessageBody, keep = true) => {
       dispatch({ type: 'append', message: { ...body, id: nextId(), at: now() } as ChatMessage });
@@ -121,63 +113,46 @@ export function CaseWorkspacePage() {
     [caseId],
   );
 
+  /* 더 물을 게 없으면 판정한다. 목이 판정 카드를 로그에 넣으므로 여기선 화면에만 붙인다 */
+  const judgeNow = useCallback(async () => {
+    const verdict = await api.judge(caseId);
+    if (activeCase.current !== caseId) return;
+    say({ role: 'ai', kind: 'verdict', verdict }, false);
+    await refresh();
+  }, [caseId, refresh, say]);
+
+  /* 분석 중에는 단계를 보여 주지 않는다. 로딩 카드 하나가 끝난 모양으로 바뀔 뿐이다 */
   const startAnalyze = useCallback(async () => {
     if (analyzing.current) return;
     analyzing.current = true;
-    analyzeStopped.current = false;
 
     const id = nextId();
-    analyzingCard.current = id;
-    dispatch({
-      type: 'append',
-      message: { id, at: now(), role: 'ai', kind: 'analyzing', step: ANALYZE_STEPS[0].doing },
-    });
+    dispatch({ type: 'append', message: { id, at: now(), role: 'ai', kind: 'analyzing' } });
 
     try {
-      for await (const event of api.analyze(caseId)) {
-        if (analyzeStopped.current || activeCase.current !== caseId) break;
-        if (event.type === 'step') dispatch({ type: 'step', id, label: event.label });
-        if (event.type === 'facts') {
-          dispatch({
-            type: 'settle',
-            message: { id, at: now(), role: 'ai', kind: 'analyzing', step: '', done: true },
-          });
-          dispatch({
-            type: 'append',
-            message: { id: nextId(), at: now(), role: 'ai', kind: 'facts', facts: event.facts },
-          });
-        }
-        if (event.type === 'failed') {
-          dispatch({
-            type: 'append',
-            message: {
-              id: nextId(),
-              at: now(),
-              role: 'ai',
-              kind: 'error',
-              code: 'analyze/failed',
-              hint: event.hint,
-            },
-          });
-        }
-      }
-    } catch (e) {
-      const err = toApiError(e, 'analyze/failed');
+      const { summary, question } = await api.analyze(caseId);
+      if (activeCase.current !== caseId) return;
       dispatch({
-        type: 'append',
-        message: { id: nextId(), at: now(), role: 'ai', kind: 'error', code: err.code, hint: err.message },
+        type: 'settle',
+        message: { id, at: now(), role: 'ai', kind: 'analyzing', done: true },
       });
+      say({ role: 'ai', kind: 'text', text: summary }, false);
+      if (question) {
+        awaiting.current = true;
+        say({ role: 'ai', kind: 'text', text: question }, false);
+        await refresh();
+      } else {
+        await judgeNow();
+      }
     } finally {
       analyzing.current = false;
-      analyzingCard.current = null;
-      await refresh();
+      if (activeCase.current === caseId) await refresh();
     }
-  }, [caseId, refresh]);
+  }, [caseId, judgeNow, refresh, say]);
 
   const startUpload = useCallback(
     async (file: File) => {
       const id = nextId();
-      let percent = 0;
       dispatch({
         type: 'append',
         message: {
@@ -188,28 +163,15 @@ export function CaseWorkspacePage() {
           fileName: file.name,
           sizeBytes: file.size,
           progress: 0,
-          state: 'uploading',
         },
       });
 
-      const abort = new AbortController();
-      uploadAbort.current = abort;
-
       try {
-        const video = await api.uploadVideo(
-          caseId,
-          file,
-          (p) => {
-            percent = p;
-            if (activeCase.current === caseId) dispatch({ type: 'progress', id, percent: p });
-          },
-          abort.signal,
-        );
-        if (activeCase.current !== caseId) return;
-        dispatch({
-          type: 'settle',
-          message: { id, at: now(), role: 'user', kind: 'video', video },
+        const video = await api.uploadVideo(caseId, file, (p) => {
+          if (activeCase.current === caseId) dispatch({ type: 'progress', id, percent: p });
         });
+        if (activeCase.current !== caseId) return;
+        dispatch({ type: 'settle', message: { id, at: now(), role: 'user', kind: 'video', video } });
         await refresh();
         /* 설명과 영상이 모이면 버튼 없이 분석이 시작된다. 설명이 없으면 먼저 청한다
            (기능명세 1.4 · 유저플로우 F1) */
@@ -222,189 +184,42 @@ export function CaseWorkspacePage() {
             text: '영상 잘 받았어요. 사고 상황을 한두 줄만 알려 주시면 바로 분석을 시작할게요.',
           });
         }
-      } catch (e) {
+      } catch {
+        /* 업로드 예외처리는 범위 밖이다 (04 문서 C4). 다만 올라가던 카드를 그대로 두면
+           영영 도는 것처럼 보여서, 한 줄로 사정을 알리고 다시 올릴 수 있게 둔다 */
         if (activeCase.current !== caseId) return;
-        const err = toApiError(e, 'upload/network');
-        const canceled = err.code === 'upload/canceled';
         dispatch({
           type: 'settle',
           message: {
             id,
             at: now(),
             role: 'ai',
-            kind: 'uploading',
-            fileName: file.name,
-            sizeBytes: file.size,
-            progress: percent,
-            state: canceled ? 'canceled' : 'failed',
-            note: canceled
-              ? `업로드를 취소했어요 · ${Math.round((file.size * percent) / 100 / 1024 / 1024)}MB에서 중단`
-              : '올리지 못했어요',
+            kind: 'text',
+            text: '영상을 올리지 못했어요. 다시 한 번 올려 주시겠어요?',
           },
         });
-        dispatch({
-          type: 'append',
-          message: { id: nextId(), at: now(), role: 'ai', kind: 'error', code: err.code, hint: err.message },
-        });
-      } finally {
-        uploadAbort.current = null;
       }
     },
     [caseId, refresh, say, startAnalyze],
   );
 
-  /* 멈추면 그대로 두지 않고 왜 멈췄는지와 다음 수를 남긴다 (규칙 0.7) */
-  const stopAnalyze = useCallback(() => {
-    analyzeStopped.current = true;
-    /* 멈춘 카드는 계속 "…하고 있어요"로 두지 않는다 */
-    const card = analyzingCard.current;
-    if (card) {
-      dispatch({
-        type: 'settle',
-        message: { id: card, at: now(), role: 'ai', kind: 'analyzing', step: '', done: true },
-      });
+  /* 예시 영상 — public/sample/에 있는 파일을 받아 진짜 고른 것처럼 같은 길로 흘린다.
+     여기서 File을 만들어 두면 업로드부터는 손으로 고른 것과 구분되지 않는다.
+     서버가 붙어도 이 길은 그대로다 (실제 업로드가 된다) */
+  const pickSample = useCallback(async () => {
+    if (!SAMPLE_VIDEO || fetchingSample.current) return;
+    fetchingSample.current = true;
+    try {
+      const res = await fetch(SAMPLE_VIDEO.url);
+      if (!res.ok) return;
+      const blob = await res.blob();
+      await startUpload(new File([blob], SAMPLE_VIDEO.name, { type: blob.type || 'video/mp4' }));
+    } catch {
+      /* 예시 파일이 없거나 못 받은 경우. 화면은 그대로 두고 [영상 올리기]로 가면 된다 */
+    } finally {
+      fetchingSample.current = false;
     }
-    dispatch({
-      type: 'append',
-      message: {
-        id: nextId(),
-        at: now(),
-        role: 'ai',
-        kind: 'error',
-        code: 'analyze/failed',
-        hint: '분석을 멈췄어요. [다시 시도]를 누르면 처음부터 다시 봐요.',
-      },
-    });
-  }, []);
-
-  /* 아직 확인 안 된 항목을 하나 골라 되묻는다. 보기가 없는 항목은 글로 답하게 둔다 */
-  const ask = useCallback(
-    (fact: Fact) => {
-      const question = FACT_QUESTIONS[fact.key];
-      pendingFact.current = question ? null : fact.key;
-      say(
-        question
-          ? {
-              role: 'ai',
-              kind: 'question',
-              field: fact.key,
-              text: question.text,
-              chips: question.chips,
-            }
-          : {
-              role: 'ai',
-              kind: 'text',
-              text: `${FACT_LABEL[fact.key]}${particle(FACT_LABEL[fact.key], '은', '는')} 어떻게 되나요? 편하게 적어 주세요.`,
-            },
-      );
-    },
-    [say],
-  );
-
-  /* 남은 게 있으면 이어서 묻고, 다 모였으면 판정을 청한다 */
-  const askNextOrJudge = useCallback(async () => {
-    const fresh = await api.getCase(caseId);
-    const rest = fresh.facts.find((f) => f.source === 'unknown' && !f.isDisputed);
-    if (rest) {
-      ask(rest);
-      await refresh();
-      return;
-    }
-    /* 이미 판정이 있으면 다시 만들지 않는다. 판정을 뒤집는 건 patchFact가 재판정을
-       돌려줄 때뿐이다 — 그러지 않으면 사실을 고칠 때마다 같은 판정 카드가 쌓인다 */
-    if (fresh.verdict) {
-      await refresh();
-      return;
-    }
-    const verdict = await api.judge(caseId);
-    dispatch({
-      type: 'append',
-      message: { id: nextId(), at: now(), role: 'ai', kind: 'verdict', verdict },
-    });
-    await refresh();
-  }, [ask, caseId, refresh]);
-
-  const confirmFacts = useCallback(() => {
-    dispatch({
-      type: 'append',
-      message: { id: nextId(), at: now(), role: 'user', kind: 'text', text: '네, 다 맞아요.' },
-    });
-    void askNextOrJudge();
-  }, [askNextOrJudge]);
-
-  const answerQuestion = useCallback(
-    async (field: FactKey, chip: Chip) => {
-      say({ role: 'user', kind: 'choice', label: chip.label, forField: field });
-      await api.answerQuestion(caseId, field, chip.isUnknown ? null : chip.value);
-      await askNextOrJudge();
-    },
-    [askNextOrJudge, caseId, say],
-  );
-
-  /* 사실 카드에서 고친 값을 확정한다 (h19).
-     판정에 쓰인 항목이면 patchFact가 재판정을 돌려주고, 그러면 h24 → h25로 이어진다 */
-  const fixFact = useCallback(
-    async (messageId: string, key: FactKey, value: string | null) => {
-      /* 고친 결과를 그 사실 카드에도 되비춘다. 안 하면 카드는 만든 시점 값에 멈춰 있다 */
-      const showFresh = async () => {
-        const fresh = await api.getCase(caseId);
-        dispatch({
-          type: 'settle',
-          message: { id: messageId, at: now(), role: 'ai', kind: 'facts', facts: fresh.facts },
-        });
-      };
-
-      if (value === null) {
-        await api.answerQuestion(caseId, key, null);
-        await showFresh();
-        await refresh();
-        return;
-      }
-      const before = itemRef.current?.verdict?.ratio ?? null;
-      const rejudged = await api.patchFact(caseId, key, value);
-      await showFresh();
-      if (rejudged && before) {
-        say(
-          {
-            role: 'ai',
-            kind: 'rejudging',
-            from: before,
-            reason: '판정에 쓰인 정보라서 과실비율을 다시 따지고 있어요…',
-          },
-          false,
-        );
-        await refresh();
-        await new Promise((r) => setTimeout(r, 1400));
-        say({ role: 'ai', kind: 'verdict', verdict: rejudged, previous: before }, false);
-      }
-      await refresh();
-    },
-    [caseId, refresh, say],
-  );
-
-  /* 상대 주장을 받으면 그 판정 카드를 그 자리에서 비교표가 있는 모습으로 바꾼다 (h22) */
-  const setClaim = useCallback(
-    async (messageId: string, ratio: Ratio) => {
-      await api.setOpponentClaim(caseId, ratio);
-      const fresh = await api.getCase(caseId);
-      if (fresh.verdict) {
-        dispatch({
-          type: 'settle',
-          message: { id: messageId, at: now(), role: 'ai', kind: 'verdict', verdict: fresh.verdict },
-        });
-      }
-      await refresh();
-    },
-    [caseId, refresh],
-  );
-
-  /* 현황판 [고치기] — 대화에 사실 카드를 한 장 더 붙인다. 대화는 추가만 한다 */
-  const editFacts = useCallback(() => {
-    const facts = itemRef.current?.facts ?? [];
-    if (facts.length === 0) return;
-    setDrawer(null);
-    say({ role: 'ai', kind: 'facts', facts });
-  }, [say]);
+  }, [startUpload]);
 
   const createStatement = useCallback(async () => {
     /* 판정 카드와 현황판 두 곳에서 부른다. 이미 있으면 새로 만들지 않고 연다 */
@@ -413,40 +228,35 @@ export function CaseWorkspacePage() {
       return;
     }
     const doc = await api.createStatement(caseId);
-    dispatch({
-      type: 'append',
-      message: { id: nextId(), at: now(), role: 'ai', kind: 'statementDraft', doc },
-    });
+    say({ role: 'ai', kind: 'statementDraft', doc }, false);
     await refresh();
-  }, [caseId, refresh, viewKey]);
+  }, [caseId, refresh, say, viewKey]);
 
-  const createRebuttal = useCallback(async () => {
-    const doc = await api.createRebuttal(caseId);
-    dispatch({
-      type: 'append',
-      message: { id: nextId(), at: now(), role: 'ai', kind: 'rebuttalDraft', doc },
-    });
-    await refresh();
-    /* 만들자마자 보내기 창을 연다 — 만들기만 하고 끝내면 다음 수가 안 보인다 */
-    setDrawer({ key: viewKey, which: 'rebuttal' });
-  }, [caseId, refresh, viewKey]);
-
+  /* 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드를 아래에 붙인다.
+     현황판과 전문 창이 보는 statement는 마지막 statementDraft에서 나오니 함께 따라온다 */
   const rewriteStatement = useCallback(
-    async (note: string) => {
+    async (instruction?: string) => {
+      if (rewriting) return;
       setRewriting(true);
       try {
-        const doc = await api.rewriteStatement(caseId, note);
-        dispatch({
-          type: 'append',
-          message: { id: nextId(), at: now(), role: 'ai', kind: 'statementDraft', doc },
-        });
+        const doc = await api.rewriteStatement(caseId, instruction || undefined);
+        if (activeCase.current !== caseId) return;
+        say({ role: 'ai', kind: 'statementDraft', doc }, false);
         await refresh();
       } finally {
         setRewriting(false);
       }
     },
-    [caseId, refresh],
+    [caseId, refresh, rewriting, say],
   );
+
+  const createRebuttal = useCallback(async () => {
+    const doc = await api.createRebuttal(caseId);
+    say({ role: 'ai', kind: 'rebuttalDraft', doc }, false);
+    await refresh();
+    /* 만들자마자 보내기 창을 연다 — 만들기만 하고 끝내면 다음 수가 안 보인다 */
+    setDrawer({ key: viewKey, which: 'rebuttal' });
+  }, [caseId, refresh, say, viewKey]);
 
   const sendRebuttal = useCallback(
     async (draft: Rebuttal) => {
@@ -476,84 +286,38 @@ export function CaseWorkspacePage() {
     [caseId, refresh, say],
   );
 
-  /* 인쇄가 막히면(팝업 차단 등) 그냥 넘기지 않고 이유를 말한다 (h32) */
-  const printStatement = useCallback(() => {
-    try {
-      window.print();
-    } catch {
-      setFailure({
-        title: 'PDF를 만들지 못했어요',
-        hint: '일시적인 오류예요. 잠시 후 다시 시도하면 대부분 해결돼요. 계속 안 되면 화면을 새로고침해 주세요.',
-        retry: () => {
-          setFailure(null);
-          window.print();
-        },
-      });
-    }
-  }, []);
-
   const sendText = useCallback(
     async (text: string) => {
-      dispatch({
-        type: 'append',
-        message: { id: nextId(), at: now(), role: 'user', kind: 'text', text },
-      });
+      /* 목이 로그에 남기므로 화면에만 붙인다 */
+      say({ role: 'user', kind: 'text', text }, false);
 
-      /* 되물은 항목에 대한 답이면 사실을 고치고, 판정에 쓰인 값이면 다시 판정한다 (2.7) */
-      const key = pendingFact.current;
-      if (key) {
-        pendingFact.current = null;
-        const before = itemRef.current?.verdict?.ratio ?? null;
-        const rejudged = await api.patchFact(caseId, key, text);
-        if (rejudged && before) {
-          const cardId = nextId();
-          dispatch({
-            type: 'append',
-            message: {
-              id: cardId,
-              at: now(),
-              role: 'ai',
-              kind: 'rejudging',
-              from: before,
-              reason: '판정에 쓰인 정보라서 과실비율을 다시 따지고 있어요…',
-            },
-          });
+      /* 되물어 둔 게 있으면 이 글이 그 답이다. 더 물을 게 남았으면 이어서 묻고,
+         없으면 바로 판정한다 (유저플로우 F2) */
+      if (awaiting.current) {
+        const { question } = await api.answerQuestion(caseId, text);
+        if (activeCase.current !== caseId) return;
+        if (question) {
+          say({ role: 'ai', kind: 'text', text: question }, false);
           await refresh();
-          await new Promise((r) => setTimeout(r, 1400));
-          dispatch({
-            type: 'append',
-            message: {
-              id: nextId(),
-              at: now(),
-              role: 'ai',
-              kind: 'verdict',
-              verdict: rejudged,
-              previous: before,
-            },
-          });
+        } else {
+          awaiting.current = false;
+          await judgeNow();
         }
-        await refresh();
-        if (!rejudged) await askNextOrJudge();
         return;
       }
 
       await api.sendMessage(caseId, text);
-      await refresh();
+      const fresh = await refresh();
       /* 영상이 먼저 와 있었다면 이 설명이 분석의 방아쇠가 된다 */
-      if (itemRef.current?.video && itemRef.current.stages.analysis === '대기') {
-        void startAnalyze();
-      }
+      if (fresh.video && fresh.stages.analysis === '대기') void startAnalyze();
     },
-    [askNextOrJudge, caseId, refresh, startAnalyze],
+    [caseId, judgeNow, refresh, say, startAnalyze],
   );
 
   useEffect(() => {
     let alive = true;
     activeCase.current = caseId;
-    /* 사건을 옮기면 앞 사건의 업로드·되물음은 여기서 끊는다 */
-    uploadAbort.current?.abort();
-    analyzeStopped.current = true;
-    pendingFact.current = null;
+    awaiting.current = false;
     Promise.all([api.getCase(caseId), api.listMessages(caseId)])
       .then(([c, past]) => {
         if (!alive) return;
@@ -562,10 +326,16 @@ export function CaseWorkspacePage() {
            접수 안내 한 장으로 시작한다 (h12) */
         dispatch({
           type: 'reset',
-          messages: past.length
-            ? past
-            : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
+          messages: past.length ? past : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
         });
+        /* 분석은 끝났는데 판정 전이고 마지막 말이 AI 글이면, 그건 던져 둔 질문이다.
+           이어서 치는 글이 그 답이 된다 (업로드 직후의 안내 글과 헷갈리면 안 된다) */
+        const last = past[past.length - 1];
+        awaiting.current =
+          c.stages.analysis === '완료' &&
+          c.verdict === null &&
+          last?.role === 'ai' &&
+          last.kind === 'text';
       })
       .catch(() => {
         if (alive) setLoaded({ id: caseId, item: null });
@@ -599,37 +369,23 @@ export function CaseWorkspacePage() {
     };
   }, []);
 
-
   const item = loaded?.id === caseId ? loaded.item : null;
 
-  /* 서류와 판정은 사건이 아니라 대화에 실려 온다. 마지막 것이 지금 것이다 */
+  /* 서류는 사건이 아니라 대화에 실려 온다. 마지막 것이 지금 것이다 */
   const lastOf = <K extends ChatMessage['kind']>(kind: K) =>
     [...chat.messages].reverse().find((m): m is Extract<ChatMessage, { kind: K }> => m.kind === kind) ??
     null;
   const statement = lastOf('statementDraft')?.doc ?? null;
   const rebuttal = lastOf('rebuttalDraft')?.doc ?? null;
-  const verdict = lastOf('verdict')?.verdict ?? null;
   /* 참고용 고지는 화면당 한 번(규칙 0.2). 판정·경위서 카드가 이미 달고 나온다 */
   const disclaimerCardId =
     [...chat.messages]
       .reverse()
       .find((m) => m.kind === 'verdict' || m.kind === 'statementDraft')?.id ?? null;
-  /* 아직 확인 안 된 항목이 있으면 서류에서 단정해 쓰지 않았다고 말해 준다 (h26·h30) */
-  const unknownFact = item?.facts.find((f) => f.source === 'unknown') ?? null;
-  const unknownLead = unknownFact
-    ? `${FACT_LABEL[unknownFact.key]}${particle(FACT_LABEL[unknownFact.key], '은', '는')} 아직 확인되지 않았어요.`
-    : null;
-  /* 같은 사실을 서류(h30)와 발송(h34)에서 다르게 안내한다. 문장을 잘라 쓰지 않는다 */
-  const unknownNote = unknownLead && `${unknownLead} 이 한 가지는 본문에 단정해서 쓰지 않았어요.`;
-  const unknownSendNote = unknownLead && `${unknownLead} 이대로 보내도 괜찮을까요?`;
 
   useEffect(() => {
     messagesRef.current = chat.messages;
   }, [chat.messages]);
-
-  useEffect(() => {
-    itemRef.current = item;
-  }, [item]);
 
   useEffect(() => {
     statementRef.current = statement;
@@ -659,7 +415,7 @@ export function CaseWorkspacePage() {
         <PrintableStatement doc={statement} title={item.title ?? '새 사건'} />
       )}
       <div className="flex h-dvh bg-bg-3 print:hidden">
-      {/* 1024 이상에서만 붙박이. 그 아래는 아래쪽 서랍이 같은 부품을 쓴다 */}
+      {/* 1024 이상에서만 붙박이. 그 아래는 왼쪽 서랍이 같은 부품을 쓴다 */}
       <div className="hidden h-full md:block">
         <Sidebar selectedId={caseId} />
       </div>
@@ -704,23 +460,17 @@ export function CaseWorkspacePage() {
                 withDisclaimer={message.id === disclaimerCardId}
                 actions={{
                   onPickVideo: pickVideo,
-                  onCancelUpload: () => uploadAbort.current?.abort(),
-                  onStopAnalyze: stopAnalyze,
-                  onRetryAnalyze: () => void startAnalyze(),
-                  onFixFact: (messageId, key, value) => void fixFact(messageId, key, value),
-                  onConfirmFacts: confirmFacts,
-                  onAnswerQuestion: answerQuestion,
-                  onOpenChart: () => pop('chart'),
+                  onPickSample: () => void pickSample(),
                   onOpenPrecedent: (p) => pop('precedent', p),
                   onCreateStatement: () => void createStatement(),
-                  onOpponentClaim: (ratio) => void setClaim(message.id, ratio),
                   onOpenStatement: () => show('statement'),
-                  onPrintStatement: printStatement,
+                  onPrintStatement: () => window.print(),
+                  onRewriteStatement: () => void rewriteStatement(),
+                  statementRewriting: rewriting,
                   onCreateRebuttal: () => void createRebuttal(),
                   onOpenRebuttal: () => show('rebuttal'),
                   onOpenProcess: () => pop('process'),
                   onOpenVideo: setPlaying,
-                  unknownNote,
                 }}
               />
             ))}
@@ -728,7 +478,16 @@ export function CaseWorkspacePage() {
           </div>
         </div>
 
-        <Composer onSend={(text) => void sendText(text)} onPickVideo={pickVideo} />
+        {/* 시안대로 첫 말을 하기 전에만 사고 상황을 청한다 (h12 → h13 이후) */}
+        <Composer
+          onSend={(text) => void sendText(text)}
+          onPickVideo={pickVideo}
+          placeholder={
+            chat.messages.some((m) => m.role === 'user')
+              ? '메시지를 입력하세요'
+              : '사고 상황을 설명해 주세요'
+          }
+        />
       </div>
 
       {/* 1280 이상에서만 붙박이 */}
@@ -741,8 +500,6 @@ export function CaseWorkspacePage() {
             showDisclaimer={disclaimerCardId === null}
             onOpenStatement={() => (statement ? show('statement') : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
-            onOpenHistory={() => pop('history')}
-            onEditFacts={editFacts}
           />
         </div>
       )}
@@ -759,32 +516,24 @@ export function CaseWorkspacePage() {
       <StatementDialog
         open={openDrawer === 'statement'}
         doc={statement}
-        unknownNote={unknownNote}
+        onRewrite={(instruction) => void rewriteStatement(instruction)}
         rewriting={rewriting}
         onClose={() => setDrawer(null)}
-        onRewrite={(note) => void rewriteStatement(note)}
-        onPrint={printStatement}
+        onPrint={() => window.print()}
       />
 
       <RebuttalDialog
         open={openDrawer === 'rebuttal'}
         doc={rebuttal}
         claimNo={item?.claimNo ?? null}
-        unknownNote={unknownSendNote}
         sending={sending}
         onClose={() => setDrawer(null)}
         onSend={(draft) => setConfirmSend(draft)}
       />
 
-      <ChartDialog open={openPopup === 'chart'} verdict={verdict} onClose={() => setPopup(null)} />
       <PrecedentDialog
         open={openPopup === 'precedent'}
         precedent={popup?.precedent ?? null}
-        onClose={() => setPopup(null)}
-      />
-      <HistoryDialog
-        open={openPopup === 'history'}
-        entries={item?.history ?? []}
         onClose={() => setPopup(null)}
       />
       <ProcessDialog open={openPopup === 'process'} onClose={() => setPopup(null)} />
@@ -792,7 +541,6 @@ export function CaseWorkspacePage() {
       <SendConfirmDialog
         open={confirmSend !== null}
         draft={confirmSend}
-        unknownNote={unknownLead}
         sending={sending}
         onBack={() => setConfirmSend(null)}
         onSend={() => confirmSend && void sendRebuttal(confirmSend)}
@@ -822,8 +570,6 @@ export function CaseWorkspacePage() {
             showDisclaimer={disclaimerCardId === null}
             onOpenStatement={() => (statement ? show('statement') : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
-            onOpenHistory={() => pop('history')}
-            onEditFacts={editFacts}
           />
         )}
       </Drawer>

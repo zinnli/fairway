@@ -11,30 +11,28 @@ export function formatRatio(r: Ratio): string {
   return `나 ${r.mine} : 상대 ${r.opponent}`;
 }
 
-/** %p = 비율끼리의 차이 */
-export function diffPoints(a: Ratio, b: Ratio): number {
-  return a.mine - b.mine;
-}
-
 export interface Adjustment {
   label: string;
   /** 내 과실에 더하거나 뺀 값 (%p) */
   delta: number;
 }
 
+/** 일치도(%)는 9/3에 빠졌다 (04 문서 C5) */
 export interface Precedent {
   /** 심의사례 번호 */
   no: string;
   summary: string;
-  /** 일치도 0~1 */
-  match: number;
   /** 뒤집힌 사례 — 우선 노출 (02 기능명세서 2.5) */
   isReversed?: boolean;
 }
 
+/**
+ * 쟁점(disputes)·상대 주장(opponentClaim)은 9/3에 빠졌다.
+ * 남는 것은 비율 · 한 줄 결론 · 근거 목록뿐이다.
+ */
 export interface Verdict {
   ratio: Ratio;
-  /** 인정기준 도표 */
+  /** 인정기준 도표 — 팝업 없이 근거 목록의 글 한 줄로만 쓴다 */
   chartName: string;
   /** ★ 번호 미확정 (00 문서 5절). null이면 화면에서 번호 칸을 숨긴다 */
   chartNo: string | null;
@@ -43,9 +41,5 @@ export interface Verdict {
   /** 한 줄 결론 */
   conclusion: string;
   precedents: Precedent[];
-  /** 쟁점 — [잘 모르겠어요]로 남은 항목에서 나온다 */
-  disputes: string[];
-  /** 상대 보험사 주장 (선택 입력, 02 기능명세서 2.6) */
-  opponentClaim?: Ratio;
   createdAt: string;
 }

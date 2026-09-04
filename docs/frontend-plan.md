@@ -5,6 +5,10 @@
 디자인 핸드오프 `00`~`03` 문서와 `10_디자인.html`(61화면)을 읽고 정리했다.
 전제: **백엔드·AI는 스펙만 확정, 구현은 나중.** 최악의 경우 프론트 단독으로 시연까지 가능해야 한다.
 
+> **2026-09-03 범위 축소.** 이 문서는 8/28 시점의 판단 근거다. 스택·구조·반응형 결론은 그대로 유효하지만,
+> **만들 기능의 목록은 `docs/handoff/04_기획축소_0903.md`가 정본이다.** 아래에서 축소분이 닿는 곳에는
+> `9/3` 표시를 달아 뒀다. 표시가 없는 절(1~4·7·9)은 바뀌지 않았다.
+
 ---
 
 ## 0. 결론 3줄
@@ -153,7 +157,7 @@ const styles = {
 
 ## 5. 아키텍처 — 61화면을 61개로 만들지 않는 법
 
-`01_화면색인.md`의 61화면을 훑어보면 **대부분이 "같은 셸 안에서 채팅에 카드가 하나 더 붙은 상태"**다. H16(분석 중) → H18(사실 확인) → H20(질문) → H21(판정)은 서로 다른 화면이 아니라 **같은 화면의 시간축 위 네 지점**이다. `00` 문서 6절도 못 박아 뒀다: **"대화는 추가만, 삭제 없음."**
+`01_화면색인.md`의 61화면을 훑어보면 **대부분이 "같은 셸 안에서 채팅에 카드가 하나 더 붙은 상태"**다. H16(분석 중) → 분석 요약 → 되묻기 → H21(판정)은 서로 다른 화면이 아니라 **같은 화면의 시간축 위 네 지점**이다. `00` 문서 6절도 못 박아 뒀다: **"대화는 추가만, 삭제 없음."**
 
 ### 라우트는 5개
 
@@ -165,7 +169,8 @@ const styles = {
 /cases/:caseId        S4 작업 화면 ★          나머지 40여 화면 전부
 ```
 
-`/cases/:caseId` 하나가 h12~h39 + f01~f04 + m05~m13을 전부 흡수한다.
+`/cases/:caseId` 하나가 h12~h37 + f01·f03·f04 + m05~m13을 전부 흡수한다.
+(**9/3** — h17 h19 h20 h21b h22 h23 h24 h25 h31 h32 h38 h39와 f02·m10은 범위에서 빠졌다.)
 
 온보딩 3단(h06 h06b h07)은 처음에 `/onboarding` 라우트로 뒀다가 **모달로 옮겼다.**
 라우트로 두면 뒤에 사이드바를 가짜로 그려 넣어야 했고, 사건이 0개일 때만 뜨는 것이라
@@ -177,26 +182,23 @@ S5(경위서 전문 h30)·S6(반박의견서 h33·h34)도 라우트가 아니라
 ### 채팅 메시지 = 판별 유니온 (이 프로젝트의 심장)
 
 ```ts
-// src/domain/message.ts
+// src/domain/message.ts  — 9/3 축소 반영 (15종 → 10종)
 export type ChatMessage =
-  | { id: string; role: 'user';  kind: 'text';      text: string }
+  | { id: string; role: 'user' | 'ai'; kind: 'text'; text: string }    // 분석 요약·질문·답이 전부 여기로
   | { id: string; role: 'user';  kind: 'video';     file: VideoRef }
-  | { id: string; role: 'user';  kind: 'choice';    label: string; forField: FactKey }
   | { id: string; role: 'ai';    kind: 'guide' }                       // h12 안내 카드
-  | { id: string; role: 'ai';    kind: 'uploading'; progress: number } // h14
-  | { id: string; role: 'ai';    kind: 'analyzing'; step: string }     // h16
-  | { id: string; role: 'ai';    kind: 'error';     code: ErrorCode; retry: RetryAction } // 0.7
-  | { id: string; role: 'ai';    kind: 'facts';     facts: Fact[] }    // h18
-  | { id: string; role: 'ai';    kind: 'question';  field: FactKey; chips: Chip[] } // h20 h20b
-  | { id: string; role: 'ai';    kind: 'verdict';   verdict: Verdict } // h21 h25
-  | { id: string; role: 'ai';    kind: 'rejudging'; from: Ratio }      // h24
+  | { id: string; role: 'ai';    kind: 'uploading'; progress: number } // h14 (취소·실패 없음)
+  | { id: string; role: 'ai';    kind: 'analyzing' }                   // h16 (단계 표시 없음)
+  | { id: string; role: 'ai';    kind: 'verdict';   verdict: Verdict } // h21
   | { id: string; role: 'ai';    kind: 'statementDraft';  doc: Statement }  // h26
   | { id: string; role: 'ai';    kind: 'rebuttalDraft';   doc: Rebuttal }   // h28
   | { id: string; role: 'ai';    kind: 'sent';      at: string; to: string } // h29
   | { id: string; role: 'ai';    kind: 'nextSteps' };                  // f04
 ```
 
-`kind`마다 카드 컴포넌트 하나 → **약 15종.** 여기에 팝업 6종(P-1~P-6)과 서류 화면 2종을 더하면 **실제로 만들 UI는 25개 남짓**이다. 61이 아니라.
+**9/3에 빠진 kind** — `choice`(선택 칩) · `facts`(h18) · `question`(칩 질문) · `rejudging`(h24) · `error`(발송 실패는 팝업으로만).
+
+`kind`마다 카드 컴포넌트 하나 → **10종.** 여기에 팝업 4종(P-1 · P-3 · P-5 발송 실패 · P-6)과 서류 모달 2종을 더하면 **실제로 만들 UI는 16개 남짓**이다. 61이 아니라.
 
 ```tsx
 // 채팅 렌더링은 이 한 줄로 끝난다
@@ -215,9 +217,9 @@ src/
     auth/         LoginPage SignupPage TermsDialog
     cases/        CaseListPage CaseCard RenameDialog DeleteDialog
     workspace/    WorkspaceLayout  Sidebar  StatusPanel  ChatColumn  Composer
-      messages/   GuideCard UploadingCard AnalyzingCard FactsCard QuestionCard
-                  VerdictCard RejudgingCard ErrorCard ... (15종)
-      dialogs/    ChartDialog CaseDialog SendConfirmDialog HistoryDialog FailDialog
+      messages/   GuideCard UploadingCard AnalyzingCard VerdictCard
+                  StatementDraft RebuttalDraft Sent NextSteps ... (10종 · 9/3)
+      dialogs/    PrecedentDialog SendConfirmDialog ErrorDialog VideoDialog
     documents/    StatementView RebuttalView PdfButton
   components/ui/  Button Chip Badge ProgressBar Drawer Dialog Icon ScrollArea
   styles/         theme.css  fonts/
@@ -242,15 +244,14 @@ export interface Api {
   listCases(): Promise<CaseSummary[]>;
   sendMessage(caseId: string, text: string): Promise<void>;
   uploadVideo(caseId: string, file: File, onProgress: (p: number) => void): Promise<VideoRef>;
-  analyze(caseId: string): AsyncIterable<AnalyzeEvent>;   // 진행 → 사실 또는 실패
-  patchFact(caseId: string, key: FactKey, value: string): Promise<Verdict | null>; // 재판정 트리거
-  setOpponentClaim(caseId: string, ratio: Ratio): Promise<void>;
+  analyze(caseId: string): Promise<AnalyzeResult>;       // 9/3 — { summary, question }
+  answerQuestion(caseId: string, text: string): Promise<{ question: string | null }>;
+  judge(caseId: string): Promise<Verdict>;
   createStatement(caseId: string): Promise<Statement>;
-  rewriteStatement(caseId: string, note: string): Promise<Statement>;
   createRebuttal(caseId: string): Promise<Rebuttal>;
   sendRebuttal(caseId: string, draft: Rebuttal): Promise<SentReceipt>;
-  listHistory(caseId: string): Promise<HistoryEntry[]>;
 }
+// 9/3에 빠진 것: patchFact · setOpponentClaim · rewriteStatement · listHistory
 
 export const api: Api = import.meta.env.VITE_API === 'http' ? httpApi : mockApi;
 ```
@@ -260,17 +261,13 @@ export const api: Api = import.meta.env.VITE_API === 'http' ? httpApi : mockApi;
 ### 시연 시나리오를 데이터로 쓴다
 `03_유저플로우.md`의 시연 사례(교차로 신호위반, 나 0 : 상대 100, 질문 2개)를 **타임라인 배열**로 만든다.
 
+**9/3 —** 분석 중에는 단계를 보여 주지 않기로 해서 타임라인은 지연 하나로 줄었다.
+
 ```ts
 // src/mocks/scenario.ts
-export const analyzeTimeline: AnalyzeEvent[] = [
-  { after:  600, type: 'step', label: '영상을 읽고 있어요' },
-  { after: 1400, type: 'step', label: '신호등을 확인하고 있어요' },
-  { after: 1200, type: 'step', label: '충돌 시점을 찾고 있어요' },
-  { after:  900, type: 'facts', facts: SEED_FACTS },   // 5/6 확정, 1개는 [확인 필요]
-];
+export const ANALYZE_DELAY = 4000;          // 로딩 표시만 두고 기다린다
+export const ANALYZE_SUMMARY = '…영상에서 본 내용 요약 글…';
 ```
-
-이러면 **시연 리허설에서 타이밍을 초 단위로 조절**할 수 있다. 실서버가 붙어도 이 타임라인은 `analyzing` 카드의 문구 소스로 그대로 쓰인다.
 
 ### Dexie로 "심사위원 접속"을 해결한다 (기능명세 6.3 · **P0**)
 6.3은 방법을 ★택1로 남겨 뒀다: *체험 계정 자동 로그인* vs *로그인 없이 브라우저별 분리*.
@@ -278,7 +275,7 @@ export const analyzeTimeline: AnalyzeEvent[] = [
 
 - 첫 방문 시 Dexie에 데모 사용자·시드 사건("주차장 후진 접촉 · 07-14", 목록이 비어 보이지 않게)을 심는다.
 - 심사위원 A와 B가 각자 브라우저에서 독립적으로 처음부터 체험한다. 서로 간섭 없음.
-- 새로고침·재방문(F6)이 진짜로 동작한다 — 채팅 마지막 위치, 현황판 최신 상태, 변경 이력까지.
+- 새로고침·재방문(F6)이 진짜로 동작한다 — 채팅 마지막 위치, 현황판 최신 상태까지. (변경 이력은 9/3 제외)
 - `/login`·`/signup` 화면은 **만들되 통과 가능하게** 둔다(6.1·6.2는 P1). 첫 화면 [시작하기]는 곧장 `/cases`로.
 - 우상단에 조용한 **[데모 초기화]**를 하나 둔다. 리허설과 심사에서 반드시 쓰게 된다.
 
@@ -322,17 +319,9 @@ Tailwind로는 `min-h-0 overflow-y-auto`. **flex 자식마다 `min-w-0`도 같�
 
 화면보다 이걸 먼저 잡아야 한다. `02_기능명세서.md` 2.x가 이미 분모 정의까지 못 박아 뒀다.
 
+**9/3 —** `Fact` 계열(`FactSource` `FactKey` `Fact`)은 전부 빠졌다. 분석 결과는 글 한 덩이다.
+
 ```ts
-export type FactSource = 'video' | 'statement' | 'unknown';   // [영상] [내가 말한 것] [확인 필요]
-export type FactKey =
-  | 'myLane' | 'opponentEntry' | 'opponentSignal'
-  | 'mySpeed' | 'impactPoint' | 'stopLineTiming';             // 필수 6 = 분모
-
-export interface Fact {
-  key: FactKey; label: string; value: string | null;
-  source: FactSource; confidence?: number; isDisputed?: boolean;
-}
-
 export interface Ratio { mine: number; opponent: number }     // 규칙 0.1 — 항상 "나 : 상대"
 
 export interface Verdict {
@@ -341,25 +330,17 @@ export interface Verdict {
   baseRatio: Ratio;
   adjustments: { label: string; delta: number }[];
   conclusion: string;
-  precedents: Precedent[];                                    // 2~3건, 뒤집힌 사례 우선
-  disputes: string[];
-  opponentClaim?: Ratio;
-}
+  precedents: Precedent[];                                    // 2~3건, 뒤집힌 사례 우선 (일치도 없음 · 9/3)
+}                                                             // disputes · opponentClaim 제거 (9/3)
 
-export type CaseStatus = '접수중' | '분석중' | '확인 필요' | '판정 완료' | '재판정중' | '발송 완료' | '종결';
+export type CaseStatus = '접수중' | '분석중' | '확인 필요' | '판정 완료' | '발송 완료' | '종결';
 export type StageState = '대기' | '진행중' | '완료';
 export interface Stages { analysis: StageState; verdict: StageState; statement: StageState; rebuttal: StageState }
 ```
 
-**확정된 사실 카운트는 저장하지 말고 파생하라.**
-```ts
-const confirmed = facts.filter(f => f.source !== 'unknown').length;  // 분자
-const total = FACT_KEYS.length;                                      // 항상 6
-// → "확인된 사실 5 / 6 · 남은 1개는 쟁점이에요"
-```
-분모를 상태로 들고 있으면 재판정 때 반드시 어긋난다.
+~~**확정된 사실 카운트는 저장하지 말고 파생하라.**~~ → **9/3 폐기.** 사실을 세지 않는다.
 
-**인정기준 도표 번호는 `null`로 두고 화면에서 조건부로 숨긴다.** 미확정 항목(`00` 문서 5절)이라 지어내면 안 되고, AI 담당이 확정하면 `chartNo` 한 필드만 채우면 5화면이 동시에 살아난다.
+**인정기준 도표 번호는 `null`로 두고 화면에서 조건부로 숨긴다.** 미확정 항목(`00` 문서 5절)이라 지어내면 안 된다. 도표 팝업(h38)은 9/3에 빠졌고, 근거 목록의 글 한 줄만 남는다.
 
 ---
 
@@ -370,7 +351,7 @@ const total = FACT_KEYS.length;                                      // 항상 6
 - `scp1`/`scp0`/`scp3` 자리 → `<button type="button">`. 사건 목록 행(`scp5`) → `<button>` 안에 제목, `⋯`는 **형제 버튼**(중첩 금지).
 - 팝업 6종(P-1~P-6) → `<dialog>` 또는 Radix `Dialog`. **포커스 트랩·Esc·스크롤 잠금**을 직접 짜면 시간을 잡아먹는다. 여기 하나만 Radix를 쓰는 게 이득이다.
 - 진행 띠 → `role="progressbar"` + `aria-valuenow/valuemin/valuemax`. `m05`·`m06`에 이미 `data-step`/`data-steps`/`aria-label`이 들어 있으니 **그 규칙을 나머지에 복사**하면 된다.
-- 분석 중·재판정 배너 → `aria-live="polite"`. 채팅에 카드가 붙는 것도 마찬가지.
+- 분석 중 표시 → `aria-live="polite"`. 채팅에 카드가 붙는 것도 마찬가지. (재판정 배너는 9/3에 빠졌다)
 - 아이콘 버튼 → `aria-label` 필수(이름이 없는 버튼이 된다).
 - 터치 영역 **모바일 44×44 예외 없음 / PC 32×32**. 보이는 아이콘 크기는 두고 감싼 상자만 키운다 → `min-h-11 min-w-11` (44px).
 
@@ -382,10 +363,10 @@ const total = FACT_KEYS.length;                                      // 항상 6
 - **1안(권장): 인쇄 CSS + `window.print()`.** 경위서 전문(`h30`, 560×900)이 이미 한 장짜리 문서 레이아웃이라 전용 `@media print` 시트를 붙이면 사용자가 "PDF로 저장"을 고를 수 있다. 한글이 폰트 그대로, 텍스트로 살아 있는 PDF가 나온다. 구현 반나절.
 - **2안: `pdfmake` + Pretendard 임베딩.** 파일명(`사건경위서_사건제목_날짜.pdf`)까지 제어되지만 폰트 base64가 커지고 레이아웃을 다시 짜야 한다.
 - **`html2canvas` + `jsPDF`는 쓰지 말 것.** 한글이 이미지로 뭉개지고 용량이 커진다. 심사에서 바로 티가 난다.
-- 어느 쪽이든 실패 경로(`h32` P-5)는 만들어야 한다 — 규칙 0.7(무엇이 안 됐나 + 어떻게 하나 + [다시 시도]).
+- ~~어느 쪽이든 실패 경로(`h32` P-5)는 만들어야 한다~~ → **9/3 제외.** PDF 실패 화면은 만들지 않는다.
 
 **메일 발송 (4.3 ★ 팀 결정)**
-- 시연은 **모의 발송 권장**: 1.5초 지연 후 성공, `h35` 확인 팝업 → `h29` 발송 완료. 실패 경로(`h36`)는 데모 초기화 옵션으로 강제 발동할 수 있게 해 두면 심사 때 오류 처리를 보여 줄 수 있다.
+- 시연은 **모의 발송 권장**: 1.5초 지연 후 성공, `h35` 확인 팝업 → `h29` 발송 완료. 실패 경로(`h36`)는 **9/3 축소 뒤 유일하게 남은 오류 화면**이므로 이것만은 만든다.
 - 진짜로 보내야 한다면 **EmailJS**(브라우저에서 가능, 무료 티어)로 팀 메일함에 보낸다. 단 첨부 용량 제한이 있어 영상 첨부는 링크로 대체해야 한다.
 
 ---
@@ -403,7 +384,7 @@ const total = FACT_KEYS.length;                                      // 항상 6
 | **9/3 (목)** | 경위서(S5) · 반박의견서(S6) · PDF · 발송 확인/완료/실패 · 잠금 규칙(4.1) | 발송 완료까지 한 줄기가 끊기지 않는다 |
 | **9/4 (금)** | 첫 화면·로그인·회원가입·약관 팝업·온보딩·사건 목록/빈 상태/이름 바꾸기/삭제 | 라우트 5개가 다 채워진다 |
 | **9/5 (토)** | **모바일 m01~m13** · 바텀시트 · 진행 띠 · 접근성(포커스·aria·44px) | 아이폰 실기기에서 전 구간 통과 |
-| **9/6 (일)** | `png/` 61장과 대조(Agentation) · 문구 검수 · 시연 타이밍 조절 · **프로덕션 배포 고정** | 심사용 URL이 살아 있다 |
+| **9/6 (일)** | `10_디자인.html`과 대조 · 문구 검수 · 시연 타이밍 조절 · **프로덕션 배포 고정** | 심사용 URL이 살아 있다 |
 | 9/7~ | 핫픽스만. 새 기능 금지 | |
 
 **우선순위가 밀리면 버리는 순서**: `h39` 변경 이력 팝업(P1) → `f01` 영상 뷰어 → `h10/h11` 이름 바꾸기·삭제 → `h03/h05` 로그인 오류 → 모바일 세부.

@@ -9,5 +9,4 @@ import { mockApi } from './mock';
 export const api: Api = mockApi;
 // export const api: Api = import.meta.env.VITE_API === 'http' ? httpApi : mockApi;
 
-export type { Api } from './types';
-export type { AnalyzeEvent } from './types';
+export type { Api, AnalyzeResult } from './types';

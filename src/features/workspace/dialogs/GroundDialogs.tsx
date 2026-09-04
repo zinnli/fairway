@@ -1,8 +1,12 @@
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
-import type { HistoryEntry } from '@/domain/case';
-import type { Precedent, Verdict } from '@/domain/verdict';
-import { formatRatio } from '@/domain/verdict';
+import type { Precedent } from '@/domain/verdict';
+
+/**
+ * 판정 카드에서 여는 팝업.
+ * 9/3 축소로 P-2 인정기준 도표(h38)와 P-4 변경 이력(h39)이 빠졌다.
+ * 남은 것은 심의사례(P-1)와 분쟁심의 절차 안내(F-04)뿐이다.
+ */
 
 /** 팝업 본문 한 줄 — 이름/값 */
 function Line({ label, children }: { label: string; children: React.ReactNode }) {
@@ -14,58 +18,7 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
   );
 }
 
-/** P-2 인정기준 도표 — h38. 번호는 미확정이라 있을 때만 보여 준다 */
-export function ChartDialog({
-  open,
-  verdict,
-  onClose,
-}: {
-  open: boolean;
-  verdict: Verdict | null;
-  onClose: () => void;
-}) {
-  return (
-    <Dialog
-      open={open && verdict !== null}
-      onClose={onClose}
-      title="인정기준 도표"
-      footer={
-        <Button variant="secondary" className="ml-auto" onClick={onClose}>
-          닫기
-        </Button>
-      }
-    >
-      {verdict && (
-        <div className="flex flex-col gap-5">
-          <p className="text-[15px] leading-[1.6] text-ink">
-            {verdict.chartNo && <span className="tnum">{verdict.chartNo} · </span>}
-            {verdict.chartName}
-          </p>
-          <p className="text-[13.5px] leading-[1.6] text-muted">
-            사고 유형별 기본 비율을 정해 둔 표예요.
-          </p>
-          <Line label="기본 과실">{formatRatio(verdict.baseRatio)}</Line>
-          <Line label="더하는 사정">
-            {verdict.adjustments.length === 0 ? (
-              '해당 없음'
-            ) : (
-              <ul className="flex flex-col gap-1">
-                {verdict.adjustments.map((a) => (
-                  <li key={a.label}>
-                    {a.label} <span className="tnum">{a.delta > 0 ? `+${a.delta}` : a.delta}%p</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Line>
-          <p className="text-[12.5px] text-muted">출처: 손해보험협회 과실비율 인정기준</p>
-        </div>
-      )}
-    </Dialog>
-  );
-}
-
-/** P-1 유사 심의사례 — h37 */
+/** P-1 유사 심의사례 — h37. 내용은 글로만 보여 준다 (일치도 배지 없음) */
 export function PrecedentDialog({
   open,
   precedent,
@@ -81,13 +34,6 @@ export function PrecedentDialog({
       onClose={onClose}
       title={precedent ? `심의사례 ${precedent.no}` : '심의사례'}
       width={480}
-      badge={
-        precedent && (
-          <span className="tnum rounded-full border border-line px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2">
-            일치도 {Math.round(precedent.match * 100)}%
-          </span>
-        )
-      }
       footer={
         <Button variant="secondary" className="ml-auto" onClick={onClose}>
           닫기
@@ -102,51 +48,7 @@ export function PrecedentDialog({
               뒤집힘 — 블랙박스로 상대 신호위반이 입증되어 일방과실이 인정된 사례예요.
             </Line>
           )}
-          <p className="text-[12.5px] leading-[1.5] text-muted">
-            이 사례가 내 사건과 다르다면 어디가 다른지 알려 주세요. 그 사례를 빼고 다시 판정해
-            드려요.
-          </p>
         </div>
-      )}
-    </Dialog>
-  );
-}
-
-/** P-4 변경 이력 — h39 */
-export function HistoryDialog({
-  open,
-  entries,
-  onClose,
-}: {
-  open: boolean;
-  entries: HistoryEntry[];
-  onClose: () => void;
-}) {
-  return (
-    <Dialog
-      open={open}
-      onClose={onClose}
-      title="변경 이력"
-      width={480}
-      footer={
-        <Button variant="secondary" className="ml-auto" onClick={onClose}>
-          닫기
-        </Button>
-      }
-    >
-      {entries.length === 0 ? (
-        <p className="text-[13.5px] text-muted">아직 바뀐 내용이 없어요.</p>
-      ) : (
-        <ul className="flex flex-col gap-4">
-          {entries.map((e) => (
-            <li key={e.id} className="flex flex-col gap-1">
-              <span className="tnum text-[12.5px] text-muted">
-                {new Date(e.at).toLocaleString('ko-KR')}
-              </span>
-              <span className="text-[14px] leading-[1.6] text-ink">{e.text}</span>
-            </li>
-          ))}
-        </ul>
       )}
     </Dialog>
   );

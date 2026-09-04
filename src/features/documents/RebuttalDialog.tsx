@@ -23,7 +23,6 @@ export function RebuttalDialog({
   open,
   doc,
   claimNo: initialClaimNo,
-  unknownNote,
   sending,
   onClose,
   onSend,
@@ -31,8 +30,6 @@ export function RebuttalDialog({
   open: boolean;
   doc: Rebuttal | null;
   claimNo: string | null;
-  /** 아직 확인되지 않은 항목이 있으면 보내기 전에 한 번 물어본다 (h34) */
-  unknownNote: string | null;
   sending?: boolean;
   onClose: () => void;
   onSend: (draft: Rebuttal) => void;
@@ -138,14 +135,6 @@ export function RebuttalDialog({
             {subjectOf(claimNo)}
           </p>
         </div>
-
-        {unknownNote && (
-          <p className="flex items-start gap-2 rounded-md border border-line bg-surface px-4 py-3 text-[13.5px] leading-[1.6] text-sand-text">
-            {/* 6px 색점 — 부품 규격이라 4배수 예외 */}
-            <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-sand" aria-hidden />
-            <span className="min-w-0">{unknownNote}</span>
-          </p>
-        )}
 
         <div className="flex flex-col gap-1">
           <label htmlFor="rebuttal-body" className="text-[12.5px] font-medium text-muted">

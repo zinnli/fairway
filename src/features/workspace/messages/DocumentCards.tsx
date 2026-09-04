@@ -10,19 +10,26 @@ function timeLabel(iso: string) {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
-/** 사건경위서 초안 — h26 */
+/**
+ * 사건경위서 초안 — h26 (h28의 서류 카드도 같은 부품이다).
+ * 9/3 축소로 "대화 N건 반영"과 쟁점 캡션이 빠졌다 (04 문서 C8·C9).
+ * [다시 쓰기]는 9/4에 되살렸다 — 누르면 새 버전 카드가 아래에 하나 더 붙는다.
+ */
 export function StatementDraftCard({
   doc,
-  unknownNote,
   onOpen,
   onPrint,
+  onRewrite,
+  rewriting,
   onCreateRebuttal,
   withDisclaimer,
 }: {
   doc: Statement;
-  unknownNote: string | null;
   onOpen: () => void;
   onPrint: () => void;
+  onRewrite: () => void;
+  /** 다시 쓰는 중. 진행 화면(h31)이 없어서 단추 하나로만 알린다 */
+  rewriting?: boolean;
   onCreateRebuttal: () => void;
   withDisclaimer?: boolean;
 }) {
@@ -47,20 +54,23 @@ export function StatementDraftCard({
         <p className="text-[12.5px] text-muted">이하 생략 — 전문 보기</p>
       </div>
 
-      <AiNote>
-        대화 {doc.reflectedMessageCount}건과 영상 분석 결과를 반영했어요.
-        {unknownNote && ` ${unknownNote}`}
-      </AiNote>
+      <AiNote>채팅에서 나눈 이야기와 영상 분석 결과를 반영했어요.</AiNote>
 
+      {/* 시안 h26 그대로 — 윗줄은 서류를 다루는 단추, 아랫줄이 다음 걸음이다 */}
       <div className="flex flex-wrap gap-2">
-        <Button onClick={onOpen}>전문 보기</Button>
+        <Button variant="secondary" onClick={onOpen}>
+          전문 보기
+        </Button>
+        <Button variant="secondary" onClick={onRewrite} disabled={rewriting}>
+          {rewriting ? '다시 쓰는 중…' : '다시 쓰기'}
+        </Button>
         <Button variant="secondary" onClick={onPrint}>
           PDF 받기
         </Button>
-        <Button variant="secondary" onClick={onCreateRebuttal}>
-          반박의견서 만들기
-        </Button>
       </div>
+      <Button className="self-start" onClick={onCreateRebuttal}>
+        반박의견서 만들기
+      </Button>
 
       {withDisclaimer && (
         <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>

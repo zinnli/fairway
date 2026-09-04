@@ -1,44 +1,32 @@
 import type { VideoRef } from '@/domain/case';
-import type { FactKey } from '@/domain/fact';
-import type { Chip, ChatMessage } from '@/domain/message';
-import type { Precedent, Ratio } from '@/domain/verdict';
+import type { ChatMessage } from '@/domain/message';
+import type { Precedent } from '@/domain/verdict';
 import { AiMessage, AiText } from './AiMessage';
 import { AnalyzingCard } from './AnalyzingCard';
 import { UploadingCard, VideoBubble } from './Attachment';
-import { ErrorCard } from './ErrorCard';
-import { FactsCard } from './FactsCard';
 import { GuideCard } from './GuideCard';
-import { QuestionCard } from './QuestionCard';
-import { RejudgingCard } from './RejudgingCard';
 import { NextStepsCard, RebuttalDraftCard, SentCard, StatementDraftCard } from './DocumentCards';
 import { UserBubble } from './UserBubble';
 import { VerdictCard } from './VerdictCard';
 
 /**
- * kind 하나당 카드 하나 (총 15종). 새 kind를 domain/message.ts에 넣으면 여기에도 한 줄 는다.
- * 아직 만들지 않은 종류는 null이다 — 순서대로 채운다.
+ * kind 하나당 카드 하나 (9/3 축소 뒤 10종).
+ * 새 kind를 domain/message.ts에 넣으면 여기에도 한 줄 는다.
  */
 export interface MessageActions {
   onPickVideo: () => void;
-  onCancelUpload: () => void;
-  onStopAnalyze: () => void;
-  onRetryAnalyze: () => void;
-  /** 고친 값을 확정한다. 그 카드도 새 값으로 갈아 끼워야 해서 카드 id를 같이 넘긴다 */
-  onFixFact: (messageId: string, key: FactKey, value: string | null) => void;
-  onConfirmFacts: () => void;
-  onAnswerQuestion: (field: FactKey, chip: Chip) => void;
-  onOpenChart: () => void;
+  onPickSample: () => void;
   onOpenPrecedent: (precedent: Precedent) => void;
   onCreateStatement: () => void;
-  onOpponentClaim: (ratio: Ratio) => void;
   onOpenStatement: () => void;
   onPrintStatement: () => void;
+  onRewriteStatement: () => void;
+  /** 다시 쓰는 중인가 (h31 진행 화면이 없어서 단추로만 알린다) */
+  statementRewriting?: boolean;
   onCreateRebuttal: () => void;
   onOpenRebuttal: () => void;
   onOpenProcess: () => void;
   onOpenVideo: (video: VideoRef) => void;
-  /** 아직 확인되지 않은 항목 안내 — 경위서 카드가 쓴다 */
-  unknownNote: string | null;
 }
 
 export function MessageItem({
@@ -53,10 +41,11 @@ export function MessageItem({
 }) {
   switch (message.kind) {
     case 'guide':
-      return <GuideCard onPickVideo={actions.onPickVideo} />;
+      return <GuideCard onPickVideo={actions.onPickVideo} onPickSample={actions.onPickSample} />;
 
     case 'text':
-      // 같은 kind가 역할에 따라 말풍선이 되기도, 카드 없는 AI 답변이 되기도 한다
+      /* 같은 kind가 역할에 따라 말풍선이 되기도, 카드 없는 AI 답변이 되기도 한다.
+         분석 요약(h18 대체)과 되물음(h20b)도 이 갈래로 온다 */
       return message.role === 'user' ? (
         <UserBubble>{message.text}</UserBubble>
       ) : (
@@ -64,9 +53,6 @@ export function MessageItem({
           <AiText>{message.text}</AiText>
         </AiMessage>
       );
-
-    case 'choice':
-      return <UserBubble>{message.label}</UserBubble>;
 
     case 'video':
       return <VideoBubble video={message.video} onOpen={() => actions.onOpenVideo(message.video)} />;
@@ -77,62 +63,30 @@ export function MessageItem({
           fileName={message.fileName}
           sizeBytes={message.sizeBytes}
           progress={message.progress}
-          state={message.state}
-          note={message.note}
-          onCancel={actions.onCancelUpload}
         />
       );
 
     case 'analyzing':
-      return (
-        <AnalyzingCard step={message.step} done={message.done} onStop={actions.onStopAnalyze} />
-      );
-
-    case 'error':
-      return (
-        <ErrorCard
-          code={message.code}
-          hint={message.hint}
-          onRetryAnalyze={actions.onRetryAnalyze}
-          onPickVideo={actions.onPickVideo}
-        />
-      );
-
-    case 'facts':
-      return (
-        <FactsCard
-          facts={message.facts}
-          onFix={(key, value) => actions.onFixFact(message.id, key, value)}
-          onConfirm={actions.onConfirmFacts}
-        />
-      );
-
-    case 'question':
-      return <QuestionCard message={message} onAnswer={actions.onAnswerQuestion} />;
+      return <AnalyzingCard done={message.done} />;
 
     case 'verdict':
       return (
         <VerdictCard
           verdict={message.verdict}
-          previous={message.previous}
-          onOpenChart={actions.onOpenChart}
           onOpenPrecedent={actions.onOpenPrecedent}
           onCreateStatement={actions.onCreateStatement}
-          onOpponentClaim={actions.onOpponentClaim}
           withDisclaimer={withDisclaimer}
         />
       );
-
-    case 'rejudging':
-      return <RejudgingCard from={message.from} reason={message.reason} />;
 
     case 'statementDraft':
       return (
         <StatementDraftCard
           doc={message.doc}
-          unknownNote={actions.unknownNote}
           onOpen={actions.onOpenStatement}
           onPrint={actions.onPrintStatement}
+          onRewrite={actions.onRewriteStatement}
+          rewriting={actions.statementRewriting}
           onCreateRebuttal={actions.onCreateRebuttal}
           withDisclaimer={withDisclaimer}
         />

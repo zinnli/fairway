@@ -1,11 +1,11 @@
-import { Button } from '@/components/ui/Button';
 import type { VideoRef } from '@/domain/case';
 import { durationLabel, mb } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
 /**
  * 올린 영상 — 오른쪽 정렬. 모바일 280 · PC 360 (m05 / h14).
- * 올라가는 중 → 완료(video) 또는 실패·취소로 같은 자리에서 모양만 바뀐다.
+ * 올라가는 중 → 완료(video)로 같은 자리에서 모양만 바뀐다.
+ * 취소·오류는 9/3에 빠져서 실패 모양이 없다 (04 문서 C4).
  */
 const CHIP =
   'box-border flex w-70 max-w-full min-w-0 flex-col self-end rounded-lg rounded-br-xs px-4 py-2 md:w-90';
@@ -28,40 +28,16 @@ export function VideoBubble({ video, onOpen }: { video: VideoRef; onOpen: () => 
   );
 }
 
-/** 올라가는 중 · 실패 · 취소 (h14 · h15 · f02) */
+/** 올라가는 중 — h14 */
 export function UploadingCard({
   fileName,
   sizeBytes,
   progress,
-  state,
-  note,
-  onCancel,
 }: {
   fileName: string;
   sizeBytes: number;
   progress: number;
-  state: 'uploading' | 'failed' | 'canceled';
-  note?: string;
-  onCancel: () => void;
 }) {
-  if (state !== 'uploading') {
-    return (
-      <div className={cn(CHIP, 'gap-1', state === 'failed' ? 'bg-danger-fill' : 'bg-brand-tint')}>
-        <p className="truncate text-[13.5px] font-semibold text-ink">
-          {state === 'failed' ? `${fileName} · ${mb(sizeBytes)}` : fileName}
-        </p>
-        <p
-          className={cn(
-            'text-[12.5px]',
-            state === 'failed' ? 'font-medium text-danger' : 'text-muted',
-          )}
-        >
-          {note ?? (state === 'failed' ? '올리지 못했어요' : '업로드를 취소했어요')}
-        </p>
-      </div>
-    );
-  }
-
   const sent = Math.round((sizeBytes * Math.min(100, progress)) / 100);
 
   return (
@@ -78,12 +54,7 @@ export function UploadingCard({
           style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
         />
       </div>
-      <div className="flex min-h-11 items-center justify-between gap-2">
-        <span className="text-[12.5px] text-muted">올리는 중…</span>
-        <Button size="sm" variant="secondary" onClick={onCancel}>
-          업로드 취소
-        </Button>
-      </div>
+      <p className="text-[12.5px] text-muted">올리는 중…</p>
     </div>
   );
 }

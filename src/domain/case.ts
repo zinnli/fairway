@@ -1,15 +1,14 @@
-import type { Fact } from './fact';
-import type { Ratio, Verdict } from './verdict';
+import type { Verdict } from './verdict';
 
-/** 목록 배지 — 규칙 0.5 */
+/** 목록 배지 — 규칙 0.5. "재판정중"은 9/3에 빠졌다 */
 export type CaseStatus =
-  | '접수중' | '분석중' | '확인 필요' | '판정 완료' | '재판정중' | '발송 완료' | '종결';
+  | '접수중' | '분석중' | '확인 필요' | '판정 완료' | '발송 완료' | '종결';
 
 /** 진행 단계 — 규칙 0.6 */
 export type StageState = '대기' | '진행중' | '완료';
 
 export interface Stages {
-  /** 완료 기준: 사실 카드 도착 */
+  /** 완료 기준: 영상 분석 요약 도착 (9/3 — 사실 카드가 아니다) */
   analysis: StageState;
   /** 완료 기준: 판정 카드 도착 */
   verdict: StageState;
@@ -28,7 +27,7 @@ export const STAGE_LABELS: { key: keyof Stages; label: string }[] = [
 
 /**
  * 모바일 머리띠가 가리키는 "지금 단계" — 아직 끝나지 않은 첫 단계다.
- * 저장하지 않고 stages에서 파생한다. 상태로 들면 재판정 때 어긋난다.
+ * 저장하지 않고 stages에서 파생한다.
  */
 export function currentStage(stages: Stages): { step: number; steps: number; label: string } {
   const found = STAGE_LABELS.findIndex(({ key }) => stages[key] !== '완료');
@@ -45,30 +44,17 @@ export interface VideoRef {
   objectUrl?: string;
 }
 
-/** 변경 이력 — 02 기능명세서 5.2 */
-export interface HistoryEntry {
-  id: string;
-  at: string;
-  kind: 'fact' | 'verdict' | 'statement' | 'pdf' | 'send';
-  /** "상대 신호: 적색 → 황색 (내가 말한 것)" */
-  text: string;
-}
-
 export interface Case {
   id: string;
   /** 분석 뒤 AI가 자동으로 붙인다. 그 전에는 null */
   title: string | null;
   status: CaseStatus;
   stages: Stages;
-  facts: Fact[];
   video: VideoRef | null;
   verdict: Verdict | null;
-  /** 재판정 전 판정 — 새 카드에서 나란히 보여 준다 */
-  previousRatio: Ratio | null;
   accidentAt: string | null;
   accidentPlace: string | null;
   claimNo: string | null;
-  history: HistoryEntry[];
   createdAt: string;
   updatedAt: string;
 }
