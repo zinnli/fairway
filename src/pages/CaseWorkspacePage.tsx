@@ -562,7 +562,8 @@ export function CaseWorkspacePage() {
       <RebuttalDialog
         open={openDrawer === 'rebuttal'}
         doc={rebuttal}
-        claimNo={item?.claimNo ?? null}
+        /* 서류에 적힌 것이 먼저다. 없으면 사건이 아는 값으로 채운다 */
+        claimNo={rebuttal?.claimNo ?? item?.claimNo ?? null}
         sending={sending}
         onClose={() => setDrawer(null)}
         onSend={(draft) => setConfirmSend(draft)}

@@ -143,12 +143,14 @@ export const toStatement = (r: ReportFullDto): Statement => ({
 
 export const toRebuttal = (r: RebuttalDto): Rebuttal => ({
   to: r.recipient ?? '',
+  claimNo: r.claimNumber,
   subject: r.subject,
   body: r.body,
   attachments: r.attachments.map((a) => ({
     id: a.refId ?? a.kind,
     label: a.name,
     included: a.included,
+    note: a.note ?? null,
   })),
   sentAt: r.status === 'sent' ? new Date().toISOString() : null,
 });
@@ -237,12 +239,14 @@ export function toMessage(m: MessageDto): ChatMessage | null {
         kind: 'rebuttalDraft',
         doc: {
           to: p.recipient ?? '',
+          claimNo: p.claimNumber,
           subject: p.subject,
           body: p.bodyPreview,
           attachments: p.attachments.map((a) => ({
             id: a.refId ?? a.kind,
             label: a.name,
             included: a.included,
+            note: a.note ?? null,
           })),
           sentAt: null,
         },

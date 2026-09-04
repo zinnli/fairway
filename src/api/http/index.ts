@@ -215,9 +215,11 @@ export const httpService: CaseService = {
 
   updateRebuttal: async (caseId, patch) =>
     toRebuttal(
+      /* 제목은 보내지 않는다 — 접수번호를 넣으면 서버가 다시 짓는다(subjectAuto).
+         우리가 보내면 그 순간 자동 생성이 꺼진다 (명세 G-2·G-3) */
       await rebuttalApi.patch(caseId, {
         ...(patch.to !== undefined ? { recipient: patch.to } : {}),
-        ...(patch.subject !== undefined ? { subject: patch.subject } : {}),
+        ...(patch.claimNo !== undefined ? { claimNumber: patch.claimNo ?? '' } : {}),
         ...(patch.body !== undefined ? { body: patch.body } : {}),
         ...(patch.attachments
           ? { attachments: patch.attachments.map((a) => ({ refId: a.id, included: a.included })) }

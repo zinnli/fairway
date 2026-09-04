@@ -105,6 +105,8 @@ export const DEMO_STATEMENT: Statement = {
 /** 반박의견서 — 보낸 뒤 상태 (h34 본문·첨부) */
 export const DEMO_REBUTTAL: Rebuttal = {
   to: 'claim@insu.co.kr',
+  /** 시연에서는 채워 둔다 — 화면에서 지우고 다시 넣어 볼 수 있다 */
+  claimNo: '2026-08-0000',
   subject: '과실비율 재검토 요청 (접수번호 2026-08-0000)',
   body:
     '블랙박스 영상에서 상대 차량의 적색 신호 진입이 확인됩니다. 인정기준 도표(신호기 있는 ' +

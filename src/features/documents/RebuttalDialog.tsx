@@ -68,6 +68,7 @@ export function RebuttalDialog({
     onSend({
       ...doc,
       to: to.trim(),
+      claimNo: claimNo.trim() || null,
       subject: subjectOf(claimNo),
       body,
       attachments: doc.attachments.map((a) => ({

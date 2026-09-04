@@ -19,9 +19,21 @@ export interface Statement {
 /** 반박의견서 — 02 기능명세서 4장 */
 export interface Rebuttal {
   to: string;
+  /**
+   * 보험사 접수번호. 이게 있어야 보험사가 사건을 찾는다 —
+   * 서버는 이걸로 제목을 자동으로 만든다(명세 G-2 `subjectAuto`).
+   * 여태 화면 안에만 있어서 서버로 넘어가지 않았다 (9/5 수정).
+   */
+  claimNo: string | null;
   subject: string;
   body: string;
-  attachments: { id: string; label: string; included: boolean }[];
+  attachments: {
+    id: string;
+    label: string;
+    included: boolean;
+    /** 서버가 붙인 사정. 첨부 합계가 25MB를 넘으면 영상이 빠지고 이유가 온다 (명세 §8.1) */
+    note?: string | null;
+  }[];
   sentAt: string | null;
 }
 
