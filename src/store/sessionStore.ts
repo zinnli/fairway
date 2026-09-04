@@ -1,6 +1,5 @@
 import { create } from 'zustand';
 import { service, type Session } from '@/api';
-import { GUEST_ACCESS } from '@/config';
 
 /**
  * 지금 누가 들어와 있는가. 라우트 가드가 이걸 본다.
@@ -39,26 +38,12 @@ export const useSessionStore = create<SessionState>((set) => ({
     if (booted) return;
     booted = true;
 
-    /* 서버가 익명 세션으로 가르는 방식이면 우리가 확인할 것이 없다 */
-    if (GUEST_ACCESS === 'anonymous') {
-      set({ status: 'in', user: null });
-      return;
-    }
-
     const restored = await service.restoreSession();
-    if (restored) {
-      set({ status: 'in', user: restored });
-      return;
-    }
-    /* 심사위원이 주소만 열었을 때 — 체험 계정으로 대신 들어간다 (6.3, P0) */
-    if (GUEST_ACCESS === 'demo') {
-      const guest = await service.demoLogin();
-      if (guest) {
-        set({ status: 'in', user: guest });
-        return;
-      }
-    }
-    set({ status: 'out', user: null, exit: '/login' });
+    set(
+      restored
+        ? { status: 'in', user: restored }
+        : { status: 'out', user: null, exit: '/login' },
+    );
   },
 
   signIn: (user) => set({ status: 'in', user, exit: '/login' }),

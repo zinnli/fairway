@@ -53,7 +53,10 @@ export const confirmPasswordReset = (input: {
     anonymous: true,
   });
 
-/** ★ A-9 체험 계정은 보류다 (부록 B-1). 붙는 날 이 줄만 쓰면 된다 */
+/**
+ * A-9 체험 계정. **지금은 부르지 않는다** — 9/5에 로그인 필수로 정했다.
+ * 서버가 A-9를 열고 방침이 바뀌면 이 줄을 쓰면 된다.
+ */
 export const demoLogin = () =>
   request<SessionDto>('/auth/demo', { method: 'POST', anonymous: true });
 

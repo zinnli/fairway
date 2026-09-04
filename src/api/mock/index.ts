@@ -2,7 +2,7 @@ import type { Case, VideoRef } from '@/domain/case';
 import { emptyStages } from '@/domain/case';
 import type { ChatMessage, MessageBody } from '@/domain/message';
 import type { Statement } from '@/domain/document';
-import type { ActiveJob, CaseDetail, CaseEvents, CaseService } from '../service';
+import type { ActiveJob, CaseDetail, CaseEvents, CaseService, Session } from '../service';
 import {
   ANALYSIS_SUMMARY,
   DEMO_CASES,

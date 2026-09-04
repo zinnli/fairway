@@ -18,7 +18,7 @@ export const VIDEO_LIMITS = {
 } as const;
 
 /**
- * 예시 영상 — 블랙박스가 없는 사람도 흐름을 끝까지 볼 수 있게 한다 (02 기능명세서 6.3, P0).
+ * 예시 영상 — 블랙박스가 없는 사람도 흐름을 끝까지 볼 수 있게 한다.
  * 파일은 `public/sample/`에 둔다. Vite가 손대지 않고 그대로 복사하므로 번들에 섞이지 않는다.
  *
  * 브라우저는 폴더를 훑어볼 수 없다 — **영상을 넣을 때 여기에 한 줄도 같이 넣는다.**
@@ -34,17 +34,6 @@ export const SAMPLE_VIDEOS: string[] = [
 
 /** 예시 영상이 놓인 자리 */
 export const sampleVideoUrl = (file: string) => `/sample/${file}`;
-
-/**
- * ★ 심사위원 접속 방식 미확정 (02 기능명세서 6.3 · API 명세 부록 B-1).
- * 6.3은 P0다 — 심사위원이 주소만 열면 바로 쓸 수 있어야 한다.
- * 팀이 어느 쪽으로 정하든 **이 한 줄만 바꾸면** 가드의 모양이 따라간다.
- *
- * · demo      로그인 없이 들어오면 체험 계정으로 대신 들어간다 (A-9). 서버가 아직 안 열었으면 로그인 화면으로
- * · anonymous 서버가 익명 세션 쿠키로 알아서 가른다 — 막지 않는다
- * · required  반드시 로그인해야 한다
- */
-export const GUEST_ACCESS: 'demo' | 'anonymous' | 'required' = 'demo';
 
 /** ★ 메일 실제 발송 여부 (02 기능명세서 4.3). 시연은 모의 발송 */
 export const EMAIL_MODE: 'mock' | 'real' = 'mock';

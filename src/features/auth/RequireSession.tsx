@@ -8,8 +8,7 @@ import { useSessionStore } from '@/store/sessionStore';
  * 아직 확인 중일 때는 아무것도 그리지 않는다 — 확인 전에 로그인 화면으로 보내면
  * 새로고침할 때마다 한 번 튕겼다 돌아오는 깜빡임이 생긴다.
  *
- * 심사위원이 주소만 열었을 때 어떻게 되는지는 `GUEST_ACCESS`(config.ts)가 정한다.
- * 여기서는 "세션이 있느냐"만 본다.
+ * 사건을 보려면 반드시 로그인해야 한다 (9/5 결정).
  */
 export function RequireSession({ children }: { children: ReactNode }) {
   const status = useSessionStore((s) => s.status);
