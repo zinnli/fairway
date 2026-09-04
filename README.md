@@ -40,14 +40,18 @@ corepack이 켜져 있으면 자동으로 맞는 버전이 쓰인다.
 - **디자인 토큰** `src/styles/theme.css` — 색·반경·간격·초점·스크롤 정본. 값은 여기 말고 어디에도 적지 않는다
 - **Pretendard 로컬 번들** `public/fonts/pretendard/` — CDN을 쓰지 않는다 (00 문서 6절)
 - **아이콘 26종** `src/components/ui/Icon.tsx` — `10_디자인.html`에서 추출. 아이콘 라이브러리 금지
-- **기본 부품** Button / SourceChip / SelectChip / StatusBadge / RatioBar / StepDots / StageIcon / Dialog / Disclaimer
-- **도메인 타입** `src/domain/` — Fact · Verdict · Case · Statement · Rebuttal · ChatMessage 유니온
+- **기본 부품** Button / StatusBadge / RatioBar / StepDots / StageIcon / Dialog / ConfirmDialog / Drawer / Field / Disclaimer / BrandMark
+- **도메인 타입** `src/domain/` — Verdict · Case · Statement · Rebuttal · ChatMessage 유니온(10종)
 - **API 계약** `src/api/service.ts` — 전송은 `src/api/http/`, 목은 `src/api/mock/`. 교체 지점은 `src/api/index.ts` 한 줄 (`VITE_API=http`)
 - **미확정 값 모음** `src/config.ts` — 서비스명 · 접수번호 필수 여부 · 영상 제한 · 메일 모드
 
-## 다음 (D2)
+## 백엔드 연동
 
-`src/api/mock/`에 Dexie 스키마 + 시연 타임라인 + MSW 핸들러. `mockApi`의 `todo()`를 실제 구현으로 바꾼다.
+`.env`에 `VITE_API_BASE`(끝에 `/api/v1`까지)와 `VITE_API=http`를 넣으면 서버로 붙는다. `.env.example` 참고.
+
+- 전송은 `src/api/http/` — 401이면 refresh 한 번 뒤 재시도, 업로드는 진행률 때문에 XHR, 결과 카드는 SSE로 받는다
+- 목은 같은 계약을 브라우저 안에서 구현한다. **메모리라 새로고침하면 시드로 돌아간다**
+- **로그인 필수** — `/cases` 아래는 `RequireSession`이 지킨다. 목은 자격을 보지 않지만 로그인은 거쳐야 한다
 
 ## 규칙 (어기면 검수에서 되돌아온다)
 
