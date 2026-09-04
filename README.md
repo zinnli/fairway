@@ -42,7 +42,7 @@ corepack이 켜져 있으면 자동으로 맞는 버전이 쓰인다.
 - **아이콘 26종** `src/components/ui/Icon.tsx` — `10_디자인.html`에서 추출. 아이콘 라이브러리 금지
 - **기본 부품** Button / SourceChip / SelectChip / StatusBadge / RatioBar / StepDots / StageIcon / Dialog / Disclaimer
 - **도메인 타입** `src/domain/` — Fact · Verdict · Case · Statement · Rebuttal · ChatMessage 유니온
-- **API 계약** `src/api/types.ts` — 백엔드 교체 지점은 `src/api/index.ts` 한 줄
+- **API 계약** `src/api/service.ts` — 전송은 `src/api/http/`, 목은 `src/api/mock/`. 교체 지점은 `src/api/index.ts` 한 줄 (`VITE_API=http`)
 - **미확정 값 모음** `src/config.ts` — 서비스명 · 접수번호 필수 여부 · 영상 제한 · 메일 모드
 
 ## 다음 (D2)

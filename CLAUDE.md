@@ -87,8 +87,11 @@ S5(경위서 전문)·S6(반박의견서)도 라우트가 아니라 모달이고
 src/
   domain/         타입 정본 — 새 개념은 여기 먼저 추가한다
                   ChatMessage는 판별 유니온. kind 하나당 카드 컴포넌트 하나 (9/3 축소 뒤 10종)
-  api/            계약. 화면은 api/types.ts의 Api 인터페이스만 안다
-                  백엔드 교체 지점은 api/index.ts 한 줄
+  api/            service.ts 가 계약이다 — 화면은 이 인터페이스만 안다 (도메인 타입만 오간다)
+                  http/  전송(client·dto·endpoints·sse) / map.ts 가 DTO↔도메인 경계 / index.ts 가 service 구현
+                  mock/  같은 계약의 브라우저 구현. 백엔드가 흔들려도 시연이 굴러가게 남긴다
+                  교체 지점은 api/index.ts 한 줄 (VITE_API=http)
+                  **분석·판정을 부르지 않는다** — 올리거나 보내면 서버가 돌리고 결과는 subscribe로 온다
   store/          caseStore(zustand) · chatReducer
   features/       auth · cases · workspace(messages/ dialogs/) · documents
   components/ui/  Button Chip Badge RatioBar StepDots StageIcon Dialog Icon Disclaimer
