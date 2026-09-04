@@ -28,7 +28,7 @@ corepack이 켜져 있으면 자동으로 맞는 버전이 쓰인다.
 
 - `docs/handoff/00_프론트_읽어주세요.md` — 디자인팀 주의사항. 화면 작업 전 확인
 - `docs/handoff/01_화면색인.md` — 화면 id ↔ 기능 번호
-- `docs/handoff/png/` — 61화면 렌더 이미지
+- 렌더 이미지(`png/`)는 9/4에 삭제 — 축소 전 화면이라 `10_디자인.html`만 본다
 - `docs/frontend-plan.md` — 아키텍처 근거와 9일 일정
 - `CLAUDE.md` — 에이전트용 규칙 요약 (사람이 읽어도 좋다)
 
