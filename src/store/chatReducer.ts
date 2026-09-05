@@ -17,7 +17,10 @@ export type ChatAction =
   | { type: 'progress'; id: string; percent: number }
   /** 진행 중이던 카드를 끝난 모양으로 갈아 끼운다 (업로드 완료·분석 종료).
    *  지우는 게 아니라 그 자리를 바꾸는 것이라 "추가만" 원칙과 어긋나지 않는다 */
-  | { type: 'settle'; message: ChatMessage };
+  | { type: 'settle'; message: ChatMessage }
+  /** 화면이 잠깐 세워 둔 카드를 치운다 (업로드 중·분석 중).
+   *  서버가 만든 진짜 카드가 도착하면 그 자리를 내준다 — 로그에 남는 카드는 지우지 않는다 */
+  | { type: 'drop'; id: string };
 
 export const emptyChat: ChatState = { messages: [] };
 
@@ -27,6 +30,9 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return { messages: action.messages };
 
     case 'append':
+      /* 같은 카드가 두 번 오는 일(내가 방금 붙인 글이 이벤트로 되돌아오는 등)은 여기서 막는다.
+         화면 쪽 거울로 거르면 같은 틱에 둘이 오면 놓친다 */
+      if (state.messages.some((m) => m.id === action.message.id)) return state;
       return { messages: [...state.messages, action.message] };
 
     case 'progress':
@@ -40,5 +46,8 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
       return {
         messages: state.messages.map((m) => (m.id === action.message.id ? action.message : m)),
       };
+
+    case 'drop':
+      return { messages: state.messages.filter((m) => m.id !== action.id) };
   }
 }

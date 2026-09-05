@@ -38,10 +38,15 @@ export function currentStage(stages: Stages): { step: number; steps: number; lab
 export interface VideoRef {
   id: string;
   name: string;
+  /** 목에서만 정확하다. 서버는 sizeLabel("18MB")로 내려준다 */
   sizeBytes: number;
+  /** 서버가 만들어 준 용량 표기. 있으면 이쪽을 그대로 쓴다 */
+  sizeLabel?: string;
   durationSec: number;
-  /** 시연에서는 브라우저 로컬 (URL.createObjectURL). 서버가 붙으면 원격 URL */
+  /** 목 시연은 브라우저 로컬 (URL.createObjectURL) */
   objectUrl?: string;
+  /** 서버가 준 재생 주소. 서명이 붙어 있고 10분이면 만료된다 */
+  streamUrl?: string;
 }
 
 export interface Case {

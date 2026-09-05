@@ -14,9 +14,13 @@
 ## 0. 결론 3줄
 
 1. **Vite + React + TypeScript SPA**가 맞다. Next를 뺀 판단은 옳고, 뒤집힐 조건은 4절에 적어 뒀다.
-2. **61화면을 61개로 만들면 진다.** 실제로는 라우트 5개 + 레이아웃 3개 + 채팅 카드 ~22종 + 상태머신 1개다.
-3. **백엔드가 없어도 시연은 완결된다.** MSW + Dexie(IndexedDB)로 "브라우저별 독립 체험"을 만들면
-   기능명세 6.3(심사위원이 주소만 열면 바로 쓸 수 있어야 함 · **P0**)이 로그인 서버 없이 그대로 충족된다.
+2. **61화면을 61개로 만들면 진다.** 실제로는 라우트 5개 + 레이아웃 3개 + 채팅 카드 10종(9/3 축소 뒤) + 상태머신 1개다.
+3. **백엔드가 없어도 시연은 완결된다.** 목이 서버와 같은 계약을 브라우저 안에서 구현한다 —
+   화면은 둘을 구분하지 못한다. 사건을 보려면 **반드시 로그인**하고(9/5 확정),
+   목은 자격을 보지 않지만 로그인은 거쳐야 한다.
+
+> **9/5 — 이 문서의 6절은 백엔드 명세(`20_API명세서_v2`)를 받고 다시 썼다.**
+> MSW·Dexie는 쓰지 않는다. 계약도 이벤트 구동으로 바뀌었다.
 
 ---
 
@@ -25,12 +29,12 @@
 | 영역 | 선택 | 이유 |
 |---|---|---|
 | 빌드 | **Vite 8 + React 19 + TypeScript** | SSR 이득이 없는 도구형 SPA. HMR이 빨라 61화면 이식에 유리 |
-| 라우팅 | **React Router v8** (declarative 모드) | 라우트가 6개뿐. 파일 기반 라우팅이 필요 없다 |
+| 라우팅 | **React Router v8** (declarative 모드) | 라우트가 5개뿐. 파일 기반 라우팅이 필요 없다 |
 | 상태 | **Zustand 5** (사건 도메인 스토어) + `useReducer`(채팅) | 채팅은 append-only 로그라 reducer가 정본. 서버 상태가 아직 없으니 TanStack Query는 보류(6절) |
 | 스타일 | **Tailwind 4** (`@theme`로 디자인 토큰) | 5,600개 인라인 스타일을 옮기는 작업이라 유틸리티가 가장 빠르다. 토큰 매핑은 7절 |
 | 폼 | **React Hook Form + Zod** | 로그인·회원가입·반박의견서 받는이. 검증 규칙이 명세에 이미 글로 있음 |
-| 목 서버 | **MSW 2** + 시나리오 타임라인 | 실서버 교체 지점을 한 곳으로 (6절) |
-| 로컬 저장 | **Dexie 4 (IndexedDB)** | 사건·영상·이력 영속화. 새로고침·재방문 플로우(F6)가 진짜로 동작함 |
+| 목 | **`src/api/mock/`** — 서버와 같은 계약을 브라우저 안에서 구현 | 네트워크를 가로채는 대신 계약을 구현한다. MSW가 필요 없다 (6절) |
+| 로컬 저장 | **없음 (메모리)** | 목 데이터는 새로고침하면 시드로 돌아간다. 영속화가 필요해지면 그때 넣는다 |
 | 아이콘 | 디자인 파일의 **인라인 SVG 추출** → 자체 `<Icon>` | 20×20 그리드·1.5px·`currentColor` 규격이 이미 고정. 아이콘 라이브러리를 넣으면 규격이 깨진다 |
 | 폰트 | **Pretendard 로컬 번들** (`woff2` + `@font-face`) | `00` 문서 6절 지시. CDN이 막히면 심사 중에 글꼴이 통째로 바뀐다 |
 | 애니메이션 | **CSS transition만** | 움직임이 "카드 등장 150ms / 아래→위 8px"과 "점 깜빡임" 둘뿐. framer-motion은 과하다 |
@@ -147,7 +151,7 @@ const styles = {
 |---|---|---|
 | AI API 키를 프론트에서 직접 부른다 | 키가 번들에 노출됨. 심사에서 지적당하기 딱 좋다 | 백엔드가 프록시하거나, Vercel Functions 1개만 두기 |
 | 반박의견서를 **진짜로** 메일 발송한다 (4.3 ★) | SMTP는 브라우저에서 못 한다 | EmailJS(클라이언트 가능) 또는 함수 1개. 시연은 **모의 발송 권장** |
-| 영상을 S3에 직접 올린다 | presigned URL 발급에 서버가 필요 | 시연은 브라우저 로컬 보관(`URL.createObjectURL` + Dexie)으로 충분 |
+| 영상을 S3에 직접 올린다 | presigned URL 발급에 서버가 필요 | 목 시연은 브라우저 로컬(`URL.createObjectURL`), 서버는 멀티파트 1단계(명세 §8.2) |
 
 → **권고:** 지금은 Vite로 간다. 위 조건이 생기면 Vercel Functions 파일 하나를 추가하면 되고, 그때도 프레임워크를 갈아엎을 필요는 없다.
 
@@ -221,7 +225,7 @@ src/
                   StatementDraft RebuttalDraft Sent NextSteps ... (10종 · 9/3)
       dialogs/    PrecedentDialog SendConfirmDialog ErrorDialog VideoDialog
     documents/    StatementView RebuttalView PdfButton
-  components/ui/  Button Chip Badge ProgressBar Drawer Dialog Icon ScrollArea
+  components/ui/  Button Badge RatioBar StepDots StageIcon Drawer Dialog ConfirmDialog Field Icon Disclaimer
   styles/         theme.css  fonts/
   mocks/          handlers.ts  scenario.ts  seed.ts
 ```
@@ -232,54 +236,65 @@ src/
 
 ---
 
-## 6. 백엔드가 없는 동안: MSW + Dexie
+## 6. 계약과 목 (9/5 — 백엔드 명세 반영)
 
-### 계약을 먼저 못 박는다
-`02_기능명세서.md` 맨 아래 "주고받는 데이터 요약"이 사실상 API 계약이다. 이걸 `src/domain/`에 타입으로 옮기고, `src/api/index.ts`에 **평범한 async 함수 묶음**으로 선언한다.
+### 화면이 아는 것은 `src/api/service.ts` 하나뿐이다
 
-```ts
-// src/api/index.ts — 화면은 이 모듈만 안다
-export interface Api {
-  createCase(): Promise<Case>;
-  listCases(): Promise<CaseSummary[]>;
-  sendMessage(caseId: string, text: string): Promise<void>;
-  uploadVideo(caseId: string, file: File, onProgress: (p: number) => void): Promise<VideoRef>;
-  analyze(caseId: string): Promise<AnalyzeResult>;       // 9/3 — { summary, question }
-  answerQuestion(caseId: string, text: string): Promise<{ question: string | null }>;
-  judge(caseId: string): Promise<Verdict>;
-  createStatement(caseId: string): Promise<Statement>;
-  createRebuttal(caseId: string): Promise<Rebuttal>;
-  sendRebuttal(caseId: string, draft: Rebuttal): Promise<SentReceipt>;
-}
-// 9/3에 빠진 것: patchFact · setOpponentClaim · rewriteStatement · listHistory
+`20_API명세서_v2`를 받고 계약을 다시 그렸다. 예전 `Api`와 두 군데가 **근본적으로** 다르다.
 
-export const api: Api = import.meta.env.VITE_API === 'http' ? httpApi : mockApi;
-```
-
-백엔드가 붙는 날 **바꾸는 파일은 이 한 줄과 `http/` 폴더뿐이다.**
-
-### 시연 시나리오를 데이터로 쓴다
-`03_유저플로우.md`의 시연 사례(교차로 신호위반, 나 0 : 상대 100, 질문 2개)를 **타임라인 배열**로 만든다.
-
-**9/3 —** 분석 중에는 단계를 보여 주지 않기로 해서 타임라인은 지연 하나로 줄었다.
+1. **분석·판정을 부르지 않는다.** 영상을 올리거나 글을 보내면 서버가 알아서 Job을 돌리고
+   결과는 SSE로만 온다. `analyze()`·`answerQuestion()`·`judge()`가 사라지고 `subscribe()`가 들어왔다.
+2. **카드를 화면이 만들지 않는다.** 서버가 만들어 밀어 준다.
+   화면이 세우는 것은 **업로드 중·분석 중 두 장**뿐이고 로그에 남지 않는다.
 
 ```ts
-// src/mocks/scenario.ts
-export const ANALYZE_DELAY = 4000;          // 로딩 표시만 두고 기다린다
-export const ANALYZE_SUMMARY = '…영상에서 본 내용 요약 글…';
+// src/api/service.ts — 화면은 이 인터페이스만 안다 (도메인 타입만 오간다)
+uploadVideo(caseId, file, onProgress): Promise<UploadResult>;
+sendMessage(caseId, text): Promise<ChatMessage>;      // 내가 친 글 한 장만 돌아온다
+subscribe(caseId, { message, caseUpdated, ... }): () => void;
 ```
 
-### Dexie로 "심사위원 접속"을 해결한다 (기능명세 6.3 · **P0**)
-6.3은 방법을 ★택1로 남겨 뒀다: *체험 계정 자동 로그인* vs *로그인 없이 브라우저별 분리*.
-백엔드가 없으니 **후자가 자연스럽게 답이 된다.**
+### 층을 둘로 가른다
 
-- 첫 방문 시 Dexie에 데모 사용자·시드 사건("주차장 후진 접촉 · 07-14", 목록이 비어 보이지 않게)을 심는다.
-- 심사위원 A와 B가 각자 브라우저에서 독립적으로 처음부터 체험한다. 서로 간섭 없음.
-- 새로고침·재방문(F6)이 진짜로 동작한다 — 채팅 마지막 위치, 현황판 최신 상태까지. (변경 이력은 9/3 제외)
-- `/login`·`/signup` 화면은 **만들되 통과 가능하게** 둔다(6.1·6.2는 P1). 첫 화면 [시작하기]는 곧장 `/cases`로.
-- 우상단에 조용한 **[데모 초기화]**를 하나 둔다. 리허설과 심사에서 반드시 쓰게 된다.
+```
+src/api/
+  service.ts          계약 — 화면이 아는 유일한 인터페이스
+  http/
+    client·dto·endpoints·sse   전송(api 로직). 도메인을 모른다
+    map.ts                      ★ 경계 — DTO↔도메인을 아는 유일한 파일
+    index.ts                    service 구현
+  mock/               같은 계약의 브라우저 구현
+  index.ts            교체 지점 한 줄 (VITE_API=http)
+```
 
-> MSW를 프로덕션 빌드에 포함하는 건 보통 피하지만, **이번엔 그게 제품이다.** `VITE_API=mock`으로 배포하고, 실서버가 붙으면 환경변수만 바꾼다.
+`endpoints/`는 도메인 타입을 import하지 않고, 화면은 DTO를 볼 수 없으며, 경로 문자열은 `endpoints/`에만 있다.
+
+### MSW도 Dexie도 쓰지 않는다
+
+계획 단계에서는 네트워크를 가로채는 목(MSW)과 영속화(Dexie)를 잡아 뒀는데, 실제로는 둘 다 넣지 않았다.
+
+- **MSW 대신 계약 구현** — 목이 `CaseService`를 그대로 구현한다. 가로챌 네트워크가 없으니
+  레이어가 하나 줄고, 화면은 목과 서버를 구분하지 못한다.
+  `package.json`의 msw는 **테스트용으로 남겨 둔다**(9/5 결정) — 지금은 핸들러가 없고 패키지만 있다.
+  서버가 붙은 뒤 http 계층을 시험할 때 네트워크를 가로채는 쪽이 필요해질 수 있다.
+- **Dexie 대신 메모리** — 목 데이터는 새로고침하면 시드로 돌아간다.
+  재방문 플로우(F6)를 목에서 끝까지 보려면 한 번에 이어서 봐야 한다. 서버가 붙으면 저절로 해결된다.
+
+### 로그인은 필수다 (9/5 확정)
+
+한동안 "심사위원이 주소만 열면 로그인 없이 쓸 수 있어야 한다"를 전제로 잡고 있었는데,
+**요강에서 그런 요건을 확인하지 못해 뺐다.** 지금은 단순하다 — 사건을 보려면 로그인한다.
+심사위원에게는 안내에 계정을 함께 적어 준다.
+
+- `/cases` 아래는 `RequireSession`이 지킨다. 확인하는 동안(`checking`)은 아무것도 그리지 않는다 —
+  확인 전에 보내면 새로고침할 때마다 로그인 화면으로 한 번 튕겼다 돌아온다.
+- 나가는 방식에 따라 가는 곳이 다르다: **눌러서 나가면 첫 화면(F05), 쓰다가 풀리면 로그인 화면.**
+  길을 옮기는 쪽과 세션을 내리는 쪽이 경쟁하지 않게 가드 한 곳에서만 정한다.
+- 로그인 화면으로 보낼 때는 원래 가려던 곳을 들려 보낸다.
+- **목도 로그인을 거치게 한다.** 자격은 보지 않지만(아무 이메일·8자 비밀번호) 거치기는 거쳐야 한다 —
+  그러지 않으면 목으로 도는 동안 가드가 아무것도 막지 못한다. 세션은 브라우저에 적어 둬서 새로고침해도 남는다.
+
+> `VITE_API=mock`으로 배포하면 백엔드 없이도 전 구간이 돈다. 실서버가 붙으면 환경변수만 바꾼다.
 
 ---
 
@@ -375,8 +390,8 @@ export interface Stages { analysis: StageState; verdict: StageState; statement: 
 
 | 날짜 | 할 일 | 끝났다는 기준 |
 |---|---|---|
-| **8/28 (금)** | Vite+TS 세팅 · Tailwind `@theme` 토큰 · Pretendard 로컬 번들 · `<Icon>` 추출 · Button/Chip/Badge/Dialog · Agentation 5분 시험 | `11_DesignSystem.html`을 우리 컴포넌트로 재현한 페이지가 뜬다 |
-| **8/29 (토)** | `domain/` 타입 전부 · `api/` 계약 · Dexie 스키마 · MSW 뼈대 · 시드 데이터 | `api.listCases()`가 시드 2건을 돌려준다 |
+| **8/28 (금)** | Vite+TS 세팅 · Tailwind `@theme` 토큰 · Pretendard 로컬 번들 · `<Icon>` 추출 · Button/Badge/Dialog · Agentation 5분 시험 | `11_DesignSystem.html`을 우리 컴포넌트로 재현한 페이지가 뜬다 |
+| **8/29 (토)** | `domain/` 타입 전부 · `api/` 계약 · 목 뼈대 · 시드 데이터 | `listCases()`가 시드를 돌려준다 |
 | **8/30 (일)** | **Sidebar(12상태) + StatusPanel(18상태)** · WorkspaceLayout · `<Panel>` 서랍 | 1920/1280/1024/768/375에서 셸이 안 깨진다 |
 | **8/31 (월)** | 채팅 카드 1차 8종 — guide/uploading/analyzing/error/facts/question/video/text | h12~h20b가 화면에 뜬다 |
 | **9/1 (화)** | 채팅 카드 2차 7종 — verdict/rejudging/statementDraft/rebuttalDraft/sent/nextSteps · 팝업 P-1·P-2 | h21·h25·h37·h38이 뜬다 |
@@ -388,7 +403,7 @@ export interface Stages { analysis: StageState; verdict: StageState; statement: 
 | 9/7~ | 핫픽스만. 새 기능 금지 | |
 
 **우선순위가 밀리면 버리는 순서**: `h39` 변경 이력 팝업(P1) → `f01` 영상 뷰어 → `h10/h11` 이름 바꾸기·삭제 → `h03/h05` 로그인 오류 → 모바일 세부.
-**절대 못 버리는 것**: 6.3(주소 열면 동작) · F1→F5 한 줄기 · 규칙 0.1(나 : 상대) · 0.2(참고용 고지).
+**절대 못 버리는 것**: F1→F5 한 줄기 · 규칙 0.1(나 : 상대) · 0.2(참고용 고지).
 
 ---
 
@@ -410,7 +425,7 @@ export interface Stages { analysis: StageState; verdict: StageState; statement: 
 
 1. **AI API 키를 프론트가 직접 쓰는가?** (예 → Vercel Functions 프록시 1개 필요, 4절)
 2. **메일은 진짜 발송인가 모의인가?** (4.3 ★ — 모의를 권함)
-3. **로그인 범위** — 6.3을 "브라우저별 분리"로 확정해도 되는지 (권함. 서버가 없어도 P0가 충족됨)
+3. ~~**로그인 범위**~~ — **9/5 해소.** 로그인 필수로 정했다. 심사위원에게는 계정을 알린다
 4. **접수번호 필수** 여부 (4.1 ★)
 5. **서비스 이름** — 9/4 전에는 확정 필요 (메일 제목·로고에 박힌다)
 6. **인정기준 도표 번호** — 9/2 전에 받으면 재작업 없이 들어간다

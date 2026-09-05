@@ -51,6 +51,8 @@ export function RebuttalDialog({
     setTouched(false);
   }
 
+  /* 서버가 빼 둔 첨부 — 왜 빠졌는지 사정이 함께 온다 (25MB 초과 등) */
+  const excluded = doc ? doc.attachments.filter((a) => !a.included && a.note) : [];
   const attachments = doc
     ? doc.attachments.filter((a) => a.included && !dropped.includes(a.id))
     : [];
@@ -59,8 +61,13 @@ export function RebuttalDialog({
     : undefined;
   const claimError =
     touched && REQUIRE_CLAIM_NO && !claimNo.trim() ? '접수번호를 넣어 주세요.' : undefined;
+  /* 보낸 문서는 그대로 보관되고 고칠 수 없다 (명세 G-2 editable · h29 안내) */
+  const alreadySent = doc?.sentAt != null;
   const canSend =
-    EMAIL.test(to.trim()) && (!REQUIRE_CLAIM_NO || claimNo.trim().length > 0) && !sending;
+    EMAIL.test(to.trim()) &&
+    (!REQUIRE_CLAIM_NO || claimNo.trim().length > 0) &&
+    !sending &&
+    !alreadySent;
 
   const send = () => {
     setTouched(true);
@@ -68,6 +75,7 @@ export function RebuttalDialog({
     onSend({
       ...doc,
       to: to.trim(),
+      claimNo: claimNo.trim() || null,
       subject: subjectOf(claimNo),
       body,
       attachments: doc.attachments.map((a) => ({
@@ -93,7 +101,11 @@ export function RebuttalDialog({
               onClick={send}
               disabled={!canSend}
               lockedReason={
-                !canSend && touched ? '받는이와 접수번호를 채우면 보내기가 열려요.' : undefined
+                alreadySent
+                  ? '보낸 문서는 수정할 수 없어요. 다시 보내려면 새 문서로 만들어요.'
+                  : !canSend && touched
+                    ? '받는이와 접수번호를 채우면 보내기가 열려요.'
+                    : undefined
               }
             >
               {sending ? '보내는 중…' : '보내기'}
@@ -173,6 +185,11 @@ export function RebuttalDialog({
               ))
             )}
           </div>
+          {excluded.map((a) => (
+            <p key={a.id} className="text-[12.5px] leading-[1.5] text-sand-text">
+              {a.label} — {a.note}
+            </p>
+          ))}
           <p className="text-[12.5px] leading-[1.5] text-muted">
             영상에는 상대 차량 번호판 등 다른 사람의 정보가 담길 수 있어요. 보험사 담당자에게만 보내
             주세요. ×를 누르면 빼고 보낼 수 있어요.

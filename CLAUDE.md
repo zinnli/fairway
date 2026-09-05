@@ -87,11 +87,15 @@ S5(경위서 전문)·S6(반박의견서)도 라우트가 아니라 모달이고
 src/
   domain/         타입 정본 — 새 개념은 여기 먼저 추가한다
                   ChatMessage는 판별 유니온. kind 하나당 카드 컴포넌트 하나 (9/3 축소 뒤 10종)
-  api/            계약. 화면은 api/types.ts의 Api 인터페이스만 안다
-                  백엔드 교체 지점은 api/index.ts 한 줄
+  api/            service.ts 가 계약이다 — 화면은 이 인터페이스만 안다 (도메인 타입만 오간다)
+                  http/  전송(client·dto·endpoints·sse) / map.ts 가 DTO↔도메인 경계 / index.ts 가 service 구현
+                  mock/  같은 계약의 브라우저 구현. 백엔드가 흔들려도 시연이 굴러가게 남긴다
+                  교체 지점은 api/index.ts 한 줄 (VITE_API=http)
+                  **분석·판정을 부르지 않는다** — 올리거나 보내면 서버가 돌리고 결과는 subscribe로 온다
   store/          caseStore(zustand) · chatReducer
   features/       auth · cases · workspace(messages/ dialogs/) · documents
-  components/ui/  Button Chip Badge RatioBar StepDots StageIcon Dialog Icon Disclaimer
+  components/ui/  Button Badge RatioBar StepDots StageIcon Dialog ConfirmDialog Drawer Field Icon Disclaimer BrandMark
+                  (Chip은 9/3에 빠졌다 — 선택 칩·출처 태그가 함께 없어졌다)
   styles/theme.css  토큰 정본
   config.ts       팀 미확정 값 전부 (APP_NAME · REQUIRE_CLAIM_NO · VIDEO_LIMITS · EMAIL_MODE)
 ```
@@ -101,9 +105,17 @@ src/
 
 ## 백엔드
 
-**스펙만 확정, 구현은 나중.** 최악의 경우 프론트 단독으로 시연까지 가야 한다.
-MSW + Dexie로 브라우저별 독립 체험을 만든다 — 이러면 기능명세 6.3(심사위원이 주소만 열면 바로 쓸 수 있어야 함, **P0**)이 로그인 서버 없이 충족된다.
-API 키를 프론트에 두지 않는다.
+**명세는 `20_API명세서_v2`가 정본이다** (9/4 수령). 최악의 경우 프론트 단독으로 시연까지 가야 한다.
+
+목이 서버와 **같은 계약**(`src/api/service.ts`)을 브라우저 안에서 구현한다 — 화면은 둘을 구분하지 못한다.
+`VITE_API=mock`으로 배포하면 백엔드 없이도 전 구간이 돈다. MSW·Dexie는 쓰지 않는다(목은 메모리라 새로고침하면 시드로 돌아간다).
+
+계약이 예전과 다른 두 가지: **분석·판정을 부르지 않는다**(올리거나 보내면 서버가 돌리고 결과는 `subscribe()`로 온다),
+**카드를 화면이 만들지 않는다**(화면이 세우는 건 업로드 중·분석 중 두 장뿐).
+
+**사건을 보려면 반드시 로그인한다** (9/5 확정). `/cases` 아래는 `RequireSession`이 지킨다.
+심사위원에게는 계정을 알려 준다 — 목으로 배포하면 아무 이메일·8자 비밀번호로도 들어가진다.
+API 키를 프론트에 두지 않는다. 액세스 토큰은 메모리에만 둔다(`localStorage` 금지).
 
 ## 팀 미확정 (지어내지 말 것)
 

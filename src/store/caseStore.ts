@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { api } from '@/api';
+import { service } from '@/api';
 import type { CaseSummary } from '@/domain/case';
 
 /**
@@ -26,23 +26,23 @@ export const useCaseStore = create<CaseState>((set, get) => ({
   markOnboardingSeen: () => set({ onboardingSeen: true }),
 
   load: async () => {
-    const list = await api.listCases();
+    const list = await service.listCases();
     set({ list, loaded: true });
   },
 
   create: async () => {
-    const created = await api.createCase();
+    const created = await service.createCase();
     await get().load();
     return created.id;
   },
 
   rename: async (caseId, title) => {
-    await api.renameCase(caseId, title);
+    await service.renameCase(caseId, title);
     await get().load();
   },
 
   remove: async (caseId) => {
-    await api.deleteCase(caseId);
+    await service.deleteCase(caseId);
     await get().load();
   },
 }));

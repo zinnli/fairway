@@ -14,7 +14,7 @@ const CHIP =
 export function VideoBubble({ video, onOpen }: { video: VideoRef; onOpen: () => void }) {
   const meta = [
     video.durationSec > 0 ? durationLabel(video.durationSec) : null,
-    mb(video.sizeBytes),
+    video.sizeLabel ?? mb(video.sizeBytes),
     '업로드 완료',
   ]
     .filter(Boolean)

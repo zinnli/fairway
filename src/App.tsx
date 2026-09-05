@@ -1,5 +1,8 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router';
+import { setSessionLostHandler } from '@/api';
+import { RequireSession } from '@/features/auth/RequireSession';
+import { useSessionStore } from '@/store/sessionStore';
 import { HomePage } from '@/pages/HomePage';
 import { LoginPage } from '@/pages/LoginPage';
 import { SignupPage } from '@/pages/SignupPage';
@@ -20,15 +23,49 @@ const DesignSystemPage = lazy(() =>
   import('@/pages/DesignSystemPage').then((m) => ({ default: m.DesignSystemPage })),
 );
 
+/**
+ * 세션 배선.
+ *
+ * · 새로고침하면 액세스 토큰이 사라진다(메모리에만 두므로) — 뜰 때 한 번 되살린다
+ * · 쓰는 도중 401이 끝내 안 풀리면 세션을 내린다. 가드가 로그인 화면으로 보낸다
+ */
+function Session() {
+  const boot = useSessionStore((s) => s.boot);
+  const expire = useSessionStore((s) => s.expire);
+
+  useEffect(() => {
+    void boot();
+    setSessionLostHandler(expire);
+    return () => setSessionLostHandler(null);
+  }, [boot, expire]);
+
+  return null;
+}
+
 export function App() {
   return (
     <BrowserRouter>
+      <Session />
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
-        <Route path="/cases" element={<CasesPage />} />
-        <Route path="/cases/:caseId" element={<CaseWorkspacePage />} />
+        <Route
+          path="/cases"
+          element={
+            <RequireSession>
+              <CasesPage />
+            </RequireSession>
+          }
+        />
+        <Route
+          path="/cases/:caseId"
+          element={
+            <RequireSession>
+              <CaseWorkspacePage />
+            </RequireSession>
+          }
+        />
         {import.meta.env.DEV && (
           <Route
             path="/design-system"

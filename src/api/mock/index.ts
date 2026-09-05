@@ -1,7 +1,8 @@
 import type { Case, VideoRef } from '@/domain/case';
 import { emptyStages } from '@/domain/case';
 import type { ChatMessage, MessageBody } from '@/domain/message';
-import type { Api } from '../types';
+import type { Statement } from '@/domain/document';
+import type { ActiveJob, CaseDetail, CaseEvents, CaseService, Session } from '../service';
 import {
   ANALYSIS_SUMMARY,
   DEMO_CASES,
@@ -14,30 +15,37 @@ import {
 import { DEMO_LOGS } from './demoLog';
 
 /**
- * 목 구현. 지금은 메모리에만 산다 — 새로고침하면 시연 데이터로 돌아간다.
+ * 목 구현 — **서버와 같은 방식으로 움직인다.**
+ * 백엔드가 흔들려도 시연이 굴러가려면 화면이 두 구현을 구분하지 못해야 한다.
  *
- * 9/3 축소 뒤 흐름은 한 줄기다:
- *   영상 → 분석(로딩) → 요약 글 → 글로 되묻기 → 판정 → 서류 → 발송.
- * 되돌아가는 길(사실 고치기·재판정·이력)은 없다.
+ * 그래서 목도 서버처럼 군다:
+ * · 액션은 곧바로 돌려주고 결과 카드는 **이벤트로 밀어 준다** (분석·판정·서류 전부)
+ * · 카드는 목이 만든다. 화면이 만드는 것은 업로드 중·분석 중 두 장뿐이다
+ * · 지금 도는 작업은 activeJob 하나로만 알린다 — 단계는 내려보내지 않는다
  *
- * ★ 목은 올린 영상과 무관하게 같은 결과를 낸다. 실제 분석은 다음 이슈다.
+ * ★ 목은 올린 영상과 무관하게 같은 결과를 낸다. 실제 분석은 백엔드 몫이다.
  */
 
 let cases: Case[] = [];
 let logs: Record<string, ChatMessage[]> = {};
-/** 사건마다 몇 번째 질문까지 물었는지. 사실을 항목으로 들고 있지 않으니 이걸로 센다 */
+/** 사건마다 몇 번째 질문까지 물었는지 */
 let asked: Record<string, number> = {};
+/** 지금 도는 작업 — 서버의 activeJob과 같은 자리 */
+let jobs: Record<string, ActiveJob | null> = {};
 
-/**
- * 목 전용 id — 서버가 붙는 날 이 함수만 지운다.
- * UTC 밀리초를 36진수로 눕히고 난수 두 자를 붙인다.
- * · 사전순 = 만든 순서 (목록을 id로도 줄 세울 수 있다)
- * · 같은 밀리초에 두 번 눌러도 갈린다 ([새 사건] 연타)
- * · 시차·서머타임과 무관하다
- * 화면은 이 규칙을 몰라야 한다. 날짜가 필요하면 createdAt을 읽는다.
- */
+/* ── 이벤트 채널 (서버의 SSE 자리) ────────────────────────────────────── */
+
+const channels = new Map<string, Set<CaseEvents>>();
+
+function emit(caseId: string, fn: (on: CaseEvents) => void) {
+  for (const on of channels.get(caseId) ?? []) fn(on);
+}
+
 const newCaseId = () =>
   `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 4)}`;
+const newMessageId = () => `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+const now = () => new Date().toISOString();
+const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function loadDemo() {
   cases = DEMO_CASES.map((c) => ({ ...c }));
@@ -47,53 +55,164 @@ function loadDemo() {
       .map(([id, log]) => [id, [...log]]),
   );
   asked = {};
+  jobs = {};
 }
 loadDemo();
+
+const find = (caseId: string) => cases.find((c) => c.id === caseId) ?? null;
 
 /** 빈 사건 = 영상도 없고 내가 보낸 말도 하나 없는 사건 */
 const isBlank = (c: Case) =>
   c.video === null && !(logs[c.id] ?? []).some((m) => m.role === 'user');
 
-const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
-
-/** 로그에도 같이 쌓아야 새로고침 뒤에 대화가 남고, isBlank 판정도 계속 맞는다 */
-function push(caseId: string, body: MessageBody) {
-  const log = (logs[caseId] ??= []);
-  log.push({ ...body, id: `${caseId}-log-${log.length + 1}`, at: new Date().toISOString() } as ChatMessage);
+/** 카드 한 장을 로그에 쌓고 채널로 흘린다 — 서버가 하는 일과 같다 */
+function push(caseId: string, body: MessageBody): ChatMessage {
+  const message = { ...body, id: newMessageId(), at: now() } as ChatMessage;
+  (logs[caseId] ??= []).push(message);
+  const c = find(caseId);
+  if (c) c.updatedAt = message.at;
+  emit(caseId, (on) => on.message?.(message));
+  return message;
 }
 
-/** 길이는 브라우저에게 물어본다. 못 읽으면 0으로 둔다 */
-function readDuration(url: string): Promise<number> {
-  return new Promise((resolve) => {
-    const el = document.createElement('video');
-    el.preload = 'metadata';
-    el.onloadedmetadata = () => resolve(Number.isFinite(el.duration) ? el.duration : 0);
-    el.onerror = () => resolve(0);
-    el.src = url;
-  });
+/** 사건이 바뀌었다고 알린다 */
+function touch(caseId: string) {
+  const c = find(caseId);
+  if (!c) return;
+  c.updatedAt = now();
+  emit(caseId, (on) => on.caseUpdated?.({ ...c }, jobs[caseId] ?? null));
 }
 
-export const mockApi: Api = {
+function setJob(caseId: string, job: ActiveJob | null) {
+  jobs[caseId] = job;
+  touch(caseId);
+}
+
+const detail = (c: Case): CaseDetail => ({ item: { ...c }, activeJob: jobs[c.id] ?? null });
+
+/* ── 흐름 ─────────────────────────────────────────────────────────────── */
+
+/** 영상과 설명이 모이면 버튼 없이 시작된다 (기능명세 1.4 · 유저플로우 F1) */
+async function runAnalysis(caseId: string) {
+  const c = find(caseId);
+  if (!c) return;
+  c.status = '분석중';
+  c.stages = { ...c.stages, analysis: '진행중' };
+  setJob(caseId, { kind: 'analysis' });
+
+  await wait(4200);
+  if (!find(caseId)) return;
+
+  c.title ??= '교차로 직진 충돌 · 08-22';
+  push(caseId, { role: 'ai', kind: 'text', text: ANALYSIS_SUMMARY });
+  push(caseId, { role: 'ai', kind: 'text', text: DEMO_QUESTIONS[0] });
+  asked[caseId] = 1;
+  c.status = '확인 필요';
+  setJob(caseId, null);
+}
+
+async function runJudge(caseId: string) {
+  const c = find(caseId);
+  if (!c) return;
+  c.stages = { ...c.stages, analysis: '완료', verdict: '진행중' };
+  setJob(caseId, { kind: 'verdict' });
+
+  await wait(2400);
+  if (!find(caseId)) return;
+
+  c.verdict = DEMO_VERDICT;
+  c.stages = { ...c.stages, verdict: '완료' };
+  c.status = '판정 완료';
+  push(caseId, { role: 'ai', kind: 'verdict', verdict: DEMO_VERDICT });
+  setJob(caseId, null);
+}
+
+const latestStatement = (caseId: string): Statement | null => {
+  const found = [...(logs[caseId] ?? [])]
+    .reverse()
+    .find((m) => m.kind === 'statementDraft');
+  return found && found.kind === 'statementDraft' ? found.doc : null;
+};
+
+/* ── 구현 ─────────────────────────────────────────────────────────────── */
+
+/**
+ * 목의 세션 — 자격은 보지 않지만 **로그인은 실제로 거쳐야 한다** (9/5 결정).
+ * 그러지 않으면 목으로 도는 동안에는 가드가 아무것도 막지 못한다.
+ *
+ * 새로고침해도 남아야 해서 브라우저에 적어 둔다. 목에는 토큰이 없고 누구인지만 적으므로
+ * "액세스 토큰은 메모리에만" 규칙과 부딪히지 않는다 — http 구현은 지금도 메모리다.
+ */
+const SESSION_KEY = 'cardefender.mock.session';
+
+const readSession = (): Session | null => {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as Session) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeSession = (user: Session | null) => {
+  try {
+    if (user) localStorage.setItem(SESSION_KEY, JSON.stringify(user));
+    else localStorage.removeItem(SESSION_KEY);
+  } catch {
+    /* 시크릿 창처럼 못 쓰는 경우 — 그 창에서는 새로고침하면 다시 로그인한다 */
+  }
+};
+
+const asUser = (email: string): Session => ({
+  id: 'demo-user',
+  email,
+  onboardedAt: null,
+  isDemo: true,
+});
+
+export const mockService: CaseService = {
+  /* 목에는 가입자 명부가 없다. 형식만 맞으면 들여보내되, 거치기는 거쳐야 한다 */
+  login: async (email) => {
+    const user = asUser(email);
+    writeSession(user);
+    return user;
+  },
+  signup: async (input) => {
+    const user = asUser(input.email);
+    writeSession(user);
+    return user;
+  },
+  logout: async () => writeSession(null),
+  restoreSession: async () => readSession(),
+  /* 목에는 법무 문구가 없다. 화면이 아는 것을 쓰게 null을 준다 */
+  getLegalDoc: async () => null,
+
+  /* 목에는 메일이 없다. 문구만 서버와 같게 돌려준다 */
+  requestPasswordReset: async () => '비밀번호 재설정 링크를 보냈어요. 메일함을 확인해 주세요.',
+  resetPassword: async () => '비밀번호를 바꿨어요. 새 비밀번호로 로그인해 주세요.',
+
+  /* 목에는 가입자 명부가 없다. 시연에 걸리지 않게 늘 쓸 수 있다고 한다 */
+  isEmailAvailable: async () => ({ available: true, reason: null }),
+
+  completeOnboarding: async () => {},
+
   listCases: async () =>
     [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(toSummary),
 
   getCase: async (caseId) => {
-    const found = cases.find((c) => c.id === caseId);
-    if (!found) throw new Error(`사건을 찾을 수 없어요: ${caseId}`);
-    return found;
+    const c = find(caseId);
+    if (!c) throw new Error(`사건을 찾을 수 없어요: ${caseId}`);
+    return detail(c);
   },
 
+  /** 빈 사건이 이미 있으면 새로 만들지 않고 그걸 다시 쓴다 — 빈 사건이 쌓이지 않게 */
   createCase: async () => {
-    /* [새 사건]을 연달아 눌러도 빈 사건이 쌓이지 않게, 이미 있으면 그것을 다시 쓴다.
-       기능명세 1.1은 "누르면 3초 안에 채팅이 열린다"고만 하지 매번 새로 만들라고 하지 않는다.
-       버튼을 잠그지 않는 이유도 같다 — 잠그면 그 확인 문장이 깨진다 */
     const blank = cases.find(isBlank);
-    if (blank) return blank;
+    if (blank) return { ...blank };
 
-    const now = new Date().toISOString();
     const created: Case = {
       id: newCaseId(),
-      title: null, // 분석 뒤 AI가 붙인다
+      title: null,
       status: '접수중',
       stages: emptyStages(),
       video: null,
@@ -101,47 +220,76 @@ export const mockApi: Api = {
       accidentAt: null,
       accidentPlace: null,
       claimNo: null,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: now(),
+      updatedAt: now(),
     };
     cases = [created, ...cases];
-    return created;
+    /* 사건을 만들면 접수 안내가 먼저 붙는다 (h12) */
+    logs[created.id] = [
+      { id: newMessageId(), at: created.createdAt, role: 'ai', kind: 'guide' },
+    ];
+    return { ...created };
   },
 
   renameCase: async (caseId, title) => {
-    const found = cases.find((c) => c.id === caseId);
-    if (found) {
-      found.title = title;
-      found.updatedAt = new Date().toISOString();
+    const c = find(caseId);
+    if (c) {
+      c.title = title;
+      c.updatedAt = now();
     }
   },
 
   deleteCase: async (caseId) => {
-    /* 영상은 사건 안에서만 산다 (규칙 0.4). 사건을 지우면 브라우저가 물고 있던
-       objectUrl도 같이 놓아 준다 */
-    const gone = cases.find((c) => c.id === caseId);
-    if (gone?.video?.objectUrl) URL.revokeObjectURL(gone.video.objectUrl);
     cases = cases.filter((c) => c.id !== caseId);
     delete logs[caseId];
     delete asked[caseId];
+    delete jobs[caseId];
   },
 
-  listMessages: async (caseId) => logs[caseId] ?? [],
-
-  appendMessage: async (caseId, body) => {
-    push(caseId, body);
-  },
+  listMessages: async (caseId) => [...(logs[caseId] ?? [])],
 
   sendMessage: async (caseId, text) => {
-    push(caseId, { role: 'user', kind: 'text', text });
-    const found = cases.find((c) => c.id === caseId);
-    if (found) found.updatedAt = new Date().toISOString();
+    const c = find(caseId);
+    if (!c) throw new Error(`사건을 찾을 수 없어요: ${caseId}`);
+
+    const mine: ChatMessage = {
+      id: newMessageId(),
+      at: now(),
+      role: 'user',
+      kind: 'text',
+      text,
+    };
+    (logs[caseId] ??= []).push(mine);
+    c.updatedAt = mine.at;
+
+    /* 답이 어디로 가는지는 사건이 어디까지 왔는지가 정한다 (서버 §1.1과 같은 갈래) */
+    void (async () => {
+      await wait(700);
+      const asking = asked[caseId] ?? 0;
+
+      if (asking > 0 && asking < DEMO_QUESTIONS.length) {
+        push(caseId, { role: 'ai', kind: 'text', text: DEMO_QUESTIONS[asking] });
+        asked[caseId] = asking + 1;
+        return;
+      }
+      if (asking >= DEMO_QUESTIONS.length && c.verdict === null) {
+        asked[caseId] = 0;
+        push(caseId, { role: 'ai', kind: 'text', text: '알겠어요. 과실비율을 계산할게요.' });
+        await runJudge(caseId);
+        return;
+      }
+      /* 영상이 먼저 와 있었다면 이 설명이 분석의 방아쇠가 된다 */
+      if (c.video && c.stages.analysis === '대기') {
+        await runAnalysis(caseId);
+      }
+    })();
+
+    return mine;
   },
 
-  /* 검사·취소·실패는 범위 밖이다 (04 문서 C4). 진행률만 흉내내고 끝난다 */
   uploadVideo: async (caseId, file, onProgress) => {
-    const found = cases.find((c) => c.id === caseId);
-    if (!found) throw new Error(`사건을 찾을 수 없어요: ${caseId}`);
+    const c = find(caseId);
+    if (!c) throw new Error(`사건을 찾을 수 없어요: ${caseId}`);
 
     const objectUrl = URL.createObjectURL(file);
     const durationSec = await readDuration(objectUrl);
@@ -158,125 +306,146 @@ export const mockApi: Api = {
       durationSec,
       objectUrl,
     };
-    found.video = video;
-    found.updatedAt = new Date().toISOString();
+    c.video = video;
+    c.updatedAt = now();
+    /* 첨부 카드는 서버가 만든다 — 목도 같게 군다 */
     push(caseId, { role: 'user', kind: 'video', video });
-    return video;
-  },
 
-  /* 단계 시각화 없이 한 번 기다렸다가 요약 글을 준다 (04 문서 C6·C7) */
-  analyze: async (caseId) => {
-    const found = cases.find((c) => c.id === caseId);
-    if (found) {
-      found.status = '분석중';
-      found.stages = { ...found.stages, analysis: '진행중' };
+    const described = (logs[caseId] ?? []).some((m) => m.role === 'user' && m.kind === 'text');
+    if (described) {
+      void runAnalysis(caseId);
+    } else {
+      /* 설명이 없으면 청한다. 이 문구는 Agent가 아니라 고정 문구다 (명세 D-1 ⑤) */
+      void wait(400).then(() =>
+        push(caseId, {
+          role: 'ai',
+          kind: 'text',
+          text: '영상 잘 받았어요. 사고 상황을 한두 문장으로 알려 주시면 바로 분석을 시작할게요.',
+        }),
+      );
     }
 
-    await wait(4200);
-
-    if (found) {
-      found.stages = { ...found.stages, analysis: '완료' };
-      found.status = '확인 필요';
-      /* 제목은 분석이 끝나면 AI가 붙인다 (기능명세 1.1).
-         목이라 사고 유형은 하나만 안다 — 날짜는 접수일에서 가져와 어긋나지 않게 한다 */
-      const at = new Date(found.createdAt);
-      const mmdd = `${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
-      found.title ??= `교차로 직진 충돌 · ${mmdd}`;
-      found.updatedAt = new Date().toISOString();
-      push(caseId, { role: 'ai', kind: 'text', text: ANALYSIS_SUMMARY });
-    }
-
-    asked[caseId] = 1;
-    push(caseId, { role: 'ai', kind: 'text', text: DEMO_QUESTIONS[0] });
-    return { summary: ANALYSIS_SUMMARY, question: DEMO_QUESTIONS[0] };
+    return { video, needsDescription: !described, analysisStarted: described };
   },
 
-  /* 답은 글로 받는다. 아직 물을 게 남았으면 다음 질문을, 없으면 null을 준다 */
-  answerQuestion: async (caseId, text) => {
-    push(caseId, { role: 'user', kind: 'text', text });
-    const done = asked[caseId] ?? 0;
-    const found = cases.find((c) => c.id === caseId);
-    if (found) found.updatedAt = new Date().toISOString();
-
-    const next = DEMO_QUESTIONS[done] ?? null;
-    if (next) {
-      asked[caseId] = done + 1;
-      push(caseId, { role: 'ai', kind: 'text', text: next });
-    }
-    return { question: next };
+  getVideo: async (videoId) => {
+    const found = cases.find((c) => c.video?.id === videoId)?.video;
+    if (!found) throw new Error(`영상을 찾을 수 없어요: ${videoId}`);
+    return found;
   },
 
-  judge: async (caseId) => {
-    await wait(600);
-    const found = cases.find((c) => c.id === caseId);
-    if (found) {
-      found.verdict = DEMO_VERDICT;
-      found.stages = { ...found.stages, verdict: '완료' };
-      found.status = '판정 완료';
-      found.updatedAt = new Date().toISOString();
-      push(caseId, { role: 'ai', kind: 'verdict', verdict: DEMO_VERDICT });
-    }
-    return DEMO_VERDICT;
-  },
+  getVerdict: async (caseId) => find(caseId)?.verdict ?? null,
+
+  getPrecedentText: async (_caseId, precedent) =>
+    `${precedent.summary} 사례예요.\n\n` +
+    '보험사는 직진차 30 : 이륜차 70을 주장했지만, 블랙박스로 상대 신호위반이 입증되어 ' +
+    '직진차 0 : 이륜차 100으로 뒤집혔어요. 내 사건과 신호 상태·진입 방향·충돌 형태가 같아요.',
 
   createStatement: async (caseId) => {
-    await wait(700);
-    const found = cases.find((c) => c.id === caseId);
-    const doc = { ...DEMO_STATEMENT, updatedAt: new Date().toISOString() };
-    if (found) {
-      found.stages = { ...found.stages, statement: '완료' };
-      found.updatedAt = doc.updatedAt;
+    const c = find(caseId);
+    if (!c) return;
+    setJob(caseId, { kind: 'report' });
+    void (async () => {
+      await wait(900);
+      if (!find(caseId)) return;
+      const doc = { ...DEMO_STATEMENT, updatedAt: now() };
+      c.stages = { ...c.stages, statement: '완료' };
       push(caseId, { role: 'ai', kind: 'statementDraft', doc });
-    }
-    return doc;
+      setJob(caseId, null);
+    })();
   },
 
-  /* 다시 쓰기 — 목은 글을 실제로 고치지 않고 버전만 올린다.
-     진짜 문장 수정은 백엔드 몫이다 (h31 진행 화면은 9/3에 빠져 로딩 표시가 없다) */
-  rewriteStatement: async (caseId) => {
-    await wait(1200);
-    const found = cases.find((c) => c.id === caseId);
-    const last = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'statementDraft');
-    const before = last && last.kind === 'statementDraft' ? last.doc : DEMO_STATEMENT;
-    const doc = { ...before, version: before.version + 1, updatedAt: new Date().toISOString() };
-    if (found) {
-      found.updatedAt = doc.updatedAt;
-      push(caseId, { role: 'ai', kind: 'statementDraft', doc });
-    }
-    return doc;
+  /** UPDATE가 아니라 새 버전이다. 카드가 한 장 더 붙는다 */
+  reviseStatement: async (caseId) => {
+    const before = latestStatement(caseId) ?? DEMO_STATEMENT;
+    setJob(caseId, { kind: 'report' });
+    void (async () => {
+      await wait(1200);
+      if (!find(caseId)) return;
+      push(caseId, {
+        role: 'ai',
+        kind: 'statementDraft',
+        doc: { ...before, version: before.version + 1, updatedAt: now() },
+      });
+      setJob(caseId, null);
+    })();
   },
 
-  renderStatementPdf: async () => {
-    /* 한글이 이미지로 뭉개지지 않게 브라우저 인쇄를 쓴다. 인쇄 본문은 화면이 들고 있다 */
+  getStatement: async (caseId) => latestStatement(caseId) ?? DEMO_STATEMENT,
+
+  /* 서버가 PDF를 만들어 주기 전까지는 인쇄 CSS로 대신한다 (html2canvas는 쓰지 않는다) */
+  downloadStatementPdf: async () => {
     window.print();
   },
 
   createRebuttal: async (caseId) => {
-    await wait(700);
-    const doc = { ...DEMO_REBUTTAL, sentAt: null };
-    push(caseId, { role: 'ai', kind: 'rebuttalDraft', doc });
-    const found = cases.find((c) => c.id === caseId);
-    if (found) found.updatedAt = new Date().toISOString();
-    return doc;
+    const c = find(caseId);
+    if (!c) return;
+    setJob(caseId, { kind: 'rebuttal' });
+    void (async () => {
+      await wait(900);
+      if (!find(caseId)) return;
+      c.stages = { ...c.stages, rebuttal: '진행중' };
+      /* 갓 만든 초안은 아직 보내지 않았다 — DEMO_REBUTTAL은 발송 뒤 모습이라 sentAt이 차 있다 */
+      push(caseId, { role: 'ai', kind: 'rebuttalDraft', doc: { ...DEMO_REBUTTAL, sentAt: null } });
+      setJob(caseId, null);
+    })();
   },
 
-  updateRebuttal: async (_caseId, draft) => draft,
-
-  sendRebuttal: async (caseId, draft) => {
-    await wait(900);
-    const at = new Date().toISOString();
-    const found = cases.find((c) => c.id === caseId);
-    if (found) {
-      found.stages = { ...found.stages, rebuttal: '완료' };
-      found.status = '발송 완료';
-      found.updatedAt = at;
-      push(caseId, { role: 'ai', kind: 'sent', to: draft.to });
-      push(caseId, { role: 'ai', kind: 'nextSteps' });
-    }
-    return { at, to: draft.to };
+  getRebuttal: async (caseId) => {
+    const found = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
+    return found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL, sentAt: null };
   },
 
-  resetDemo: async () => {
-    loadDemo();
+  updateRebuttal: async (caseId, patch) => {
+    const found = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
+    const before =
+      found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL, sentAt: null };
+    const next = { ...before, ...patch };
+    if (found && found.kind === 'rebuttalDraft') found.doc = next;
+    return next;
+  },
+
+  sendRebuttal: async (caseId) => {
+    const c = find(caseId);
+    if (!c) return;
+    await wait(1200);
+    const draft = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
+    const to = draft && draft.kind === 'rebuttalDraft' ? draft.doc.to : DEMO_REBUTTAL.to;
+    const at = now();
+    if (draft && draft.kind === 'rebuttalDraft') draft.doc = { ...draft.doc, sentAt: at };
+    c.stages = { ...c.stages, rebuttal: '완료' };
+    c.status = '발송 완료';
+    push(caseId, { role: 'ai', kind: 'sent', to });
+    push(caseId, { role: 'ai', kind: 'nextSteps' });
+    emit(caseId, (on) => on.rebuttalSent?.(at, to));
+    touch(caseId);
+  },
+
+  subscribe: (caseId, on) => {
+    const set = channels.get(caseId) ?? new Set<CaseEvents>();
+    set.add(on);
+    channels.set(caseId, set);
+    return () => {
+      set.delete(on);
+      if (set.size === 0) channels.delete(caseId);
+    };
   },
 };
+
+/** 시연·리허설용. 목에만 있다 */
+export const resetDemo = () => loadDemo();
+
+/**
+ * 영상 길이는 브라우저에게 물어본다. 못 읽으면 0을 준다 —
+ * 코덱을 지원하지 않는 파일(mp4v·HEVC)이면 여기서 걸린다.
+ */
+function readDuration(url: string): Promise<number> {
+  return new Promise((resolve) => {
+    const el = document.createElement('video');
+    el.preload = 'metadata';
+    el.onloadedmetadata = () => resolve(Number.isFinite(el.duration) ? el.duration : 0);
+    el.onerror = () => resolve(0);
+    el.src = url;
+  });
+}

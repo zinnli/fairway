@@ -6,6 +6,7 @@ import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
 import { useCaseStore } from '@/store/caseStore';
+import { useSessionStore } from '@/store/sessionStore';
 import { CaseRow } from './CaseRow';
 
 /**
@@ -26,6 +27,9 @@ export function Sidebar({
   const { list, loaded, load, create, rename, remove } = useCaseStore();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const signOut = useSessionStore((s) => s.signOut);
+  /* 사이드바 아래에 지금 들어와 있는 사람을 보여 준다 */
+  const user = useSessionStore((s) => s.user);
 
   useEffect(() => {
     if (!loaded) void load();
@@ -77,10 +81,10 @@ export function Sidebar({
           className="box-border flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-line bg-surface text-[12px] leading-[1.35] font-medium text-ink-2"
           aria-hidden
         >
-          현
+          {(user?.email?.[0] ?? '체').toUpperCase()}
         </span>
         <span className="min-w-0 flex-1 truncate text-[12.5px] text-muted">
-          demo@cardefender.kr
+          {user?.email ?? '체험 중'}
         </span>
         <button
           type="button"
@@ -111,7 +115,9 @@ export function Sidebar({
         onClose={() => setLogoutOpen(false)}
         onConfirm={() => {
           setLogoutOpen(false);
-          navigate('/');
+          /* 서버 세션과 쿠키까지 끊는다. 사건·영상·서류는 계정에 남는다 (명세 A-3).
+             길은 가드가 옮긴다 — 눌러서 나간 것이므로 첫 화면으로 간다 (F05) */
+          void signOut();
         }}
         title="로그아웃할까요?"
         description="사건과 영상, 서류는 계정에 안전하게 보관돼요. 다시 로그인하면 이어서 볼 수 있어요."

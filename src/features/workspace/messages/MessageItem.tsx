@@ -1,4 +1,5 @@
 import type { VideoRef } from '@/domain/case';
+import { Button } from '@/components/ui/Button';
 import type { ChatMessage } from '@/domain/message';
 import type { Precedent } from '@/domain/verdict';
 import { AiMessage, AiText } from './AiMessage';
@@ -15,7 +16,9 @@ import { VerdictCard } from './VerdictCard';
  */
 export interface MessageActions {
   onPickVideo: () => void;
-  onPickSample: () => void;
+  onPickSample: (file: string) => void;
+  /** 예시 영상을 받아 오는 중 */
+  sampleLoading?: boolean;
   onOpenPrecedent: (precedent: Precedent) => void;
   onCreateStatement: () => void;
   onOpenStatement: () => void;
@@ -41,7 +44,11 @@ export function MessageItem({
 }) {
   switch (message.kind) {
     case 'guide':
-      return <GuideCard onPickVideo={actions.onPickVideo} onPickSample={actions.onPickSample} />;
+      return <GuideCard
+          onPickVideo={actions.onPickVideo}
+          onPickSample={actions.onPickSample}
+          sampleLoading={actions.sampleLoading}
+        />;
 
     case 'text':
       /* 같은 kind가 역할에 따라 말풍선이 되기도, 카드 없는 AI 답변이 되기도 한다.
@@ -51,6 +58,19 @@ export function MessageItem({
       ) : (
         <AiMessage>
           <AiText>{message.text}</AiText>
+          {/* 서버가 붙여 준 단추 — h13 [영상 올리기] · h27 [사건경위서 먼저 만들기] */}
+          {message.cta && (
+            <Button
+              className="mt-1 self-start"
+              onClick={
+                message.cta.action === 'uploadVideo'
+                  ? actions.onPickVideo
+                  : actions.onCreateStatement
+              }
+            >
+              {message.cta.label}
+            </Button>
+          )}
         </AiMessage>
       );
 
@@ -67,7 +87,7 @@ export function MessageItem({
       );
 
     case 'analyzing':
-      return <AnalyzingCard done={message.done} />;
+      return <AnalyzingCard phase={message.phase} done={message.done} />;
 
     case 'verdict':
       return (
@@ -99,6 +119,6 @@ export function MessageItem({
       return <SentCard at={message.at} to={message.to} />;
 
     case 'nextSteps':
-      return <NextStepsCard onOpenProcess={actions.onOpenProcess} />;
+      return <NextStepsCard steps={message.steps} onOpenProcess={actions.onOpenProcess} />;
   }
 }

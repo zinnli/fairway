@@ -9,6 +9,8 @@ import { AuthCard } from '@/features/auth/AuthCard';
 import { TermsDialog } from '@/features/auth/TermsDialog';
 import { TERM_ORDER, type TermKey } from '@/features/auth/terms';
 import { zodResolver } from '@/lib/zodResolver';
+import { isApiError, service } from '@/api';
+import { useSessionStore } from '@/store/sessionStore';
 
 /**
  * S2 회원가입 — h04(기본) · h05(오류) · h40(약관 팝업).
@@ -53,6 +55,23 @@ export function SignupPage() {
   });
   const [openTerm, setOpenTerm] = useState<TermKey | null>(null);
   const [duplicateEmail, setDuplicateEmail] = useState<string | null>(null);
+  /**
+   * A-6 이메일 중복 확인. 가입 눌러 보기 전에 미리 알려 준다.
+   * 명세대로 **보조 수단**이라 실패해도 조용히 넘어간다 — 진짜 판정은 A-1이 한다.
+   */
+  const checkEmail = async (email: string) => {
+    if (!email || errors.email) return;
+    try {
+      const { available, reason } = await service.isEmailAvailable(email);
+      setDuplicateEmail(available ? null : email);
+      if (!available && reason) setFieldErrors((prev) => ({ ...prev, email: reason }));
+    } catch {
+      /* 못 물어봐도 가입은 막지 않는다 */
+    }
+  };
+  /* 서버가 칸마다 붙여 준 문구 (§2.3 fields) */
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const signIn = useSessionStore((s) => s.signIn);
 
   const {
     register,
@@ -65,9 +84,34 @@ export function SignupPage() {
   const allAgreed = TERM_ORDER.every((key) => agreed[key]);
   const canSubmit = isValid && allAgreed;
 
-  const onSubmit = handleSubmit(() => {
+  /**
+   * 형식·동의는 여기서 보고, 중복과 정책은 서버가 본다 (명세 A-1).
+   * 여러 항목이 함께 틀리면 서버가 fields에 전부 담아 준다 — 칸마다 그대로 붙인다.
+   */
+  const onSubmit = handleSubmit(async (form) => {
     setDuplicateEmail(null);
-    navigate('/cases', { replace: true });
+    setFieldErrors({});
+    try {
+      const session = await service.signup({
+        email: form.email,
+        password: form.password,
+        passwordConfirm: form.passwordConfirm,
+        agreements: {
+          termsOfService: agreed.service,
+          privacy: agreed.privacy,
+          videoConsent: agreed.video,
+        },
+      });
+      signIn(session);
+      navigate('/cases', { replace: true });
+    } catch (e) {
+      if (isApiError(e)) {
+        setFieldErrors(e.fields ?? {});
+        if (e.code === 'AUTH_EMAIL_DUPLICATED') setDuplicateEmail(form.email);
+        return;
+      }
+      setFieldErrors({ email: '연결이 끊겼어요. 잠시 후 다시 시도해 주세요.' });
+    }
   });
 
   return (
@@ -79,16 +123,19 @@ export function SignupPage() {
           autoComplete="email"
           placeholder="you@example.com"
           error={
-            duplicateEmail ? '이미 가입된 이메일이에요. 로그인해 주세요.' : errors.email?.message
+            duplicateEmail
+              ? '이미 가입된 이메일이에요. 로그인해 주세요.'
+              : (errors.email?.message ?? fieldErrors.email)
           }
           {...register('email')}
+          onBlur={(e) => void checkEmail(e.target.value.trim())}
         />
         <Field
           label="비밀번호"
           type="password"
           autoComplete="new-password"
           placeholder="8자 이상, 숫자 포함"
-          error={errors.password?.message}
+          error={errors.password?.message ?? fieldErrors.password}
           {...register('password')}
         />
         <Field
@@ -96,7 +143,7 @@ export function SignupPage() {
           type="password"
           autoComplete="new-password"
           placeholder="한 번 더 입력"
-          error={errors.passwordConfirm?.message}
+          error={errors.passwordConfirm?.message ?? fieldErrors.passwordConfirm}
           {...register('passwordConfirm')}
         />
 
@@ -113,6 +160,10 @@ export function SignupPage() {
           <p className="pl-7 text-[12.5px] leading-[1.5] text-muted">
             영상은 과실비율 분석에만 쓰고, 사건을 지우면 함께 지워져요.
           </p>
+          {/* 서버가 동의를 물리면 그 문구를 그대로 붙인다 (AGREEMENT_REQUIRED) */}
+          {fieldErrors.agreements && (
+            <p className="pl-7 text-[12.5px] leading-[1.5] text-danger">{fieldErrors.agreements}</p>
+          )}
         </div>
 
         <div className="flex flex-col gap-2">

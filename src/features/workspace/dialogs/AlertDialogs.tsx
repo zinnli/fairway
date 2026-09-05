@@ -1,23 +1,34 @@
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
+import type { ApiErrorAction } from '@/api';
 import type { Rebuttal } from '@/domain/document';
 
 /**
- * P-5 오류 — 9/3 축소 뒤 남은 실패 경로는 발송(h36) 하나뿐이다.
- * 규칙 0.7: 무엇이 안 됐는지 + 어떻게 하면 되는지 + [다시 시도]가 늘 같이 온다.
+ * P-5 오류 — 무엇이 안 됐는지 + 어떻게 하면 되는지 (규칙 0.7).
+ *
+ * 문구도 단추도 **서버가 정한다** (명세 §2.3):
+ * `title`·`message`는 완성 문장으로 오고, `actions`에 그릴 단추가, `retryable`에
+ * [다시 시도]를 낼지가 담겨 온다. 화면에서 문구를 새로 만들지 않는다.
  */
 export function ErrorDialog({
   open,
   title,
   hint,
+  retryable = true,
+  actions = [],
   onClose,
   onRetry,
+  onAction,
 }: {
   open: boolean;
   title: string;
   hint: string;
+  /** 서버가 다시 해 볼 만하다고 한 경우에만 [다시 시도]를 낸다 */
+  retryable?: boolean;
+  actions?: ApiErrorAction[];
   onClose: () => void;
   onRetry: () => void;
+  onAction?: (action: ApiErrorAction) => void;
 }) {
   return (
     <Dialog
@@ -31,7 +42,13 @@ export function ErrorDialog({
           <Button variant="secondary" onClick={onClose}>
             닫기
           </Button>
-          <Button onClick={onRetry}>다시 시도</Button>
+          {/* 서버가 지정한 다음 걸음. 예: [사건경위서 먼저 만들기] */}
+          {actions.map((action) => (
+            <Button key={action.type} onClick={() => onAction?.(action)}>
+              {action.label}
+            </Button>
+          ))}
+          {retryable && actions.length === 0 && <Button onClick={onRetry}>다시 시도</Button>}
         </>
       }
     >
