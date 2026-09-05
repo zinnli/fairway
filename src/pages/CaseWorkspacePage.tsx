@@ -35,6 +35,8 @@ import { useCaseStore } from '@/store/caseStore';
  */
 let seq = 0;
 const nextId = () => `m${++seq}`;
+/** 답을 이만큼 기다려도 안 오면 기다림 표시를 걷는다 */
+const REPLY_TIMEOUT_MS = 60_000;
 const now = () => new Date().toISOString();
 
 export function CaseWorkspacePage() {
@@ -108,6 +110,12 @@ export function CaseWorkspacePage() {
   const loadingCardId = useRef<string | null>(null);
   /* 내가 보낸 글에 대한 답을 기다리는 카드. Job이 없어서 activeJob으로는 못 잡는다 */
   const replyCardId = useRef<string | null>(null);
+  /* 카드를 세우기 **전에** 답을 기다리기 시작한다 — 답이 POST 응답보다 먼저 올 수 있다 */
+  const awaitingReply = useRef(false);
+  /* 서버가 끝내 답하지 않는 경우가 있다. 점이 영영 도는 것보다 조용히 걷는 편이 낫다 */
+  const replyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /* 전문을 이미 청한 버전. 서버가 뒤처진 값을 주면 무한히 다시 청하게 된다 */
+  const fetchedVersion = useRef<number | null>(null);
   /* 콜백 안에서 지금 서류가 있는지 봐야 한다 */
   const statementRef = useRef<Statement | null>(null);
   /* 지금 보고 있는 사건. 업로드·분석이 도는 동안 사건을 바꾸면
@@ -126,6 +134,11 @@ export function CaseWorkspacePage() {
   }, [caseId, reloadList]);
 
   const dropReplyCard = useCallback(() => {
+    awaitingReply.current = false;
+    if (replyTimer.current !== null) {
+      clearTimeout(replyTimer.current);
+      replyTimer.current = null;
+    }
     if (replyCardId.current === null) return;
     dispatch({ type: 'drop', id: replyCardId.current });
     replyCardId.current = null;
@@ -296,12 +309,15 @@ export function CaseWorkspacePage() {
     async (kind: 'report' | 'rebuttal', call: () => Promise<void>) => {
       /* [다시 시도]가 같은 길을 그대로 다시 타도록 안쪽에 둔다 */
       const go = async () => {
-        setActiveJob({ kind });
+        /* 분석·판정이 돌고 있으면 그대로 둔다 — 덮어쓰면 그쪽 로딩 카드가 사라진다.
+           사건당 Job은 하나뿐이라(명세 §2.6) 서버도 어차피 받아 주지 않는다 */
+        setActiveJob((cur) => cur ?? { kind });
         try {
           await call();
         } catch (e) {
           if (activeCase.current !== caseId) return;
-          setActiveJob(null);
+          /* 내가 세운 것만 내린다 */
+          setActiveJob((cur) => (cur?.kind === kind ? null : cur));
           showFailure(e, () => void go());
         }
       };
@@ -368,20 +384,38 @@ export function CaseWorkspacePage() {
    */
   const sendText = useCallback(
     async (text: string) => {
-      const mine = await service.sendMessage(caseId, text);
-      if (activeCase.current !== caseId) return;
-      dispatch({ type: 'append', message: mine });
+      /* [다시 시도]가 같은 길을 그대로 다시 타도록 안쪽에 둔다 */
+      const go = async () => {
+        /* 기다림은 보내기 **전에** 시작한다. 답이 POST 응답보다 먼저 도착하면
+           dropReplyCard가 이 깃발을 내려, 뒤늦게 카드를 세우지 않는다 */
+        awaitingReply.current = true;
+        let mine;
+        try {
+          mine = await service.sendMessage(caseId, text);
+        } catch (e) {
+          if (activeCase.current !== caseId) return;
+          dropReplyCard();
+          showFailure(e, () => void go());
+          return;
+        }
+        if (activeCase.current !== caseId) return;
+        dispatch({ type: 'append', message: mine });
 
-      if (replyCardId.current === null) {
+        if (!awaitingReply.current || replyCardId.current !== null) return;
         const id = nextId();
         replyCardId.current = id;
         dispatch({
           type: 'append',
           message: { id, at: now(), role: 'ai', kind: 'analyzing', phase: 'reply' },
         });
-      }
+        /* 서버가 끝내 답하지 않아도 점이 영영 돌지는 않게 한다 (04 문서에 실패 화면은 없다) */
+        replyTimer.current = setTimeout(() => {
+          if (activeCase.current === caseId) dropReplyCard();
+        }, REPLY_TIMEOUT_MS);
+      };
+      await go();
     },
-    [caseId],
+    [caseId, dropReplyCard, showFailure],
   );
 
   /**
@@ -394,7 +428,8 @@ export function CaseWorkspacePage() {
     let stop: (() => void) | null = null;
     activeCase.current = caseId;
     loadingCardId.current = null;
-    replyCardId.current = null;
+    dropReplyCard();
+    fetchedVersion.current = null;
 
     Promise.all([service.getCase(caseId), service.listMessages(caseId)])
       .then(([{ item: c, activeJob: job }, past]) => {
@@ -584,15 +619,18 @@ export function CaseWorkspacePage() {
    * 그때 손에 든 전문(statementFull)은 이전 버전이라, 그대로 두면 전문 모달이
    * 계속 옛 글을 보여 준다 — 카드가 더 새것이면 그쪽을 보여 주고 전문은 다시 받아 온다.
    */
-  const statementShown =
-    statementFull && (!statement || statementFull.version >= statement.version)
-      ? statementFull
-      : statement;
+  /* **카드 doc에는 절이 없다** — 미리보기 문장만 온다(map.ts). 그래서 전문 자리에는
+     늘 전문을 쓰고, 뒤처졌으면 아래 effect가 받아다 갈아 끼운다 */
+  const statementShown = statementFull ?? statement;
 
   useEffect(() => {
     const version = statement?.version;
-    if (openDrawer !== 'statement' || version === undefined) return;
+    if (version === undefined) return;
     if (statementFull && statementFull.version >= version) return;
+    /* 같은 버전을 두 번 청하지 않는다 — 서버가 낮은 버전을 돌려주면
+       statementFull이 갱신되지 않아 effect가 끝없이 다시 돈다 */
+    if (fetchedVersion.current === version) return;
+    fetchedVersion.current = version;
 
     let alive = true;
     service
@@ -601,12 +639,12 @@ export function CaseWorkspacePage() {
         if (alive && activeCase.current === caseId) setFullDoc({ id: caseId, doc: full });
       })
       .catch(() => {
-        /* 못 받아도 카드가 받쳐 준다 (statementShown) */
+        /* 다음에 열 때 다시 받는다 (openStatement가 열기 전에 받아 온다) */
       });
     return () => {
       alive = false;
     };
-  }, [caseId, openDrawer, statement, statementFull]);
+  }, [caseId, statement, statementFull]);
 
   const notFound = loaded?.id === caseId && loaded.item === null;
 

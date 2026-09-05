@@ -25,7 +25,7 @@ export function AnalyzingCard({
     <AiMessage className="gap-2">
       <p className="flex items-center gap-2 text-[15px] font-semibold text-ink">
         {done ? '영상을 다 봤어요' : label}
-        {!done && <Dots className="text-brand" label={label} />}
+        {!done && <Dots className="text-brand" />}
       </p>
       {!done && note && <AiNote>{note}</AiNote>}
     </AiMessage>

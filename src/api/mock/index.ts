@@ -281,7 +281,18 @@ export const mockService: CaseService = {
       /* 영상이 먼저 와 있었다면 이 설명이 분석의 방아쇠가 된다 */
       if (c.video && c.stages.analysis === '대기') {
         await runAnalysis(caseId);
+        return;
       }
+      /* **어느 갈래에도 걸리지 않으면 반드시 한 마디는 한다.**
+         판정이 끝난 뒤에 아무 말이나 치면 위 셋이 전부 거짓이라 답이 없었고,
+         화면의 답 대기 표시가 영영 돌았다. 서버는 언제나 reply를 준다(§1.1 ④) */
+      push(caseId, {
+        role: 'ai',
+        kind: 'text',
+        text: c.verdict
+          ? '말씀 잘 들었어요. 판정은 그대로예요 — 서류를 만들거나 보내는 것을 도와드릴게요.'
+          : '알겠어요. 영상을 올려 주시면 분석을 시작할게요.',
+      });
     })();
 
     return mine;

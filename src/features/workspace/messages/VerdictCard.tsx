@@ -105,7 +105,7 @@ export function VerdictCard({
         {statementBusy ? (
           <>
             사건경위서 만드는 중
-            <Dots label="사건경위서 만드는 중" />
+            <Dots />
           </>
         ) : (
           <>

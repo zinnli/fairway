@@ -44,9 +44,12 @@ export function UploadingCard({
     <div className={cn(CHIP, 'gap-2 bg-brand-tint')}>
       <div className="flex items-baseline justify-between gap-2">
         <span className="min-w-0 truncate text-[13.5px] font-semibold text-ink">{fileName}</span>
-        <span className="tnum shrink-0 text-[12.5px] text-muted">
-          {mb(sent)} / {mb(sizeBytes)}
-        </span>
+        {/* 크기를 아직 모르면(예시 영상을 받아 오는 중) 지어내지 않고 뺀다 */}
+        {sizeBytes > 0 && (
+          <span className="tnum shrink-0 text-[12.5px] text-muted">
+            {mb(sent)} / {mb(sizeBytes)}
+          </span>
+        )}
       </div>
       <div className="h-2 overflow-hidden rounded-full bg-line-2">
         <div

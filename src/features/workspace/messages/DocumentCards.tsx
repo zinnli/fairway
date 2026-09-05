@@ -70,7 +70,7 @@ export function StatementDraftCard({
           {rewriting ? (
             <>
               다시 쓰는 중
-              <Dots label="다시 쓰는 중" />
+              <Dots />
             </>
           ) : (
             '다시 쓰기'

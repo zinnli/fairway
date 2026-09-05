@@ -51,8 +51,11 @@ export function RebuttalDialog({
    * 여는 쪽(openRebuttal)이 **전문을 받아 온 뒤에** 열어 주므로,
    * 열리는 순간의 doc이 이미 최종본이다.
    */
+  /* 창이 실제로 보이는 조건과 같아야 한다(아래 Dialog의 open). doc이 아직 없을 때
+     씨앗을 박아 두면, 나중에 초안이 SSE로 붙어 창이 떠도 빈 칸으로 남는다 */
+  const visible = open && doc !== null;
   const [seededOpen, setSeededOpen] = useState(false);
-  if (open && !seededOpen) {
+  if (visible && !seededOpen) {
     setSeededOpen(true);
     setTo(doc?.to ?? '');
     setBody(doc?.body ?? '');
@@ -60,7 +63,7 @@ export function RebuttalDialog({
     setDropped([]);
     setTouched(false);
   }
-  if (!open && seededOpen) setSeededOpen(false);
+  if (!visible && seededOpen) setSeededOpen(false);
 
   /* 서버가 빼 둔 첨부 — 왜 빠졌는지 사정이 함께 온다 (25MB 초과 등) */
   const excluded = doc ? doc.attachments.filter((a) => !a.included && a.note) : [];
@@ -98,7 +101,7 @@ export function RebuttalDialog({
 
   return (
     <Dialog
-      open={open && doc !== null}
+      open={visible}
       onClose={onClose}
       title="반박의견서 보내기"
       width={640}
