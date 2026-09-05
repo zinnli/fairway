@@ -37,6 +37,7 @@ let seq = 0;
 const nextId = () => `m${++seq}`;
 /** 답을 이만큼 기다려도 안 오면 기다림 표시를 걷는다 */
 const REPLY_TIMEOUT_MS = 60_000;
+
 const now = () => new Date().toISOString();
 
 export function CaseWorkspacePage() {
@@ -609,6 +610,24 @@ export function CaseWorkspacePage() {
       .reverse()
       .find((m) => m.kind === 'verdict' || m.kind === 'statementDraft')?.id ?? null;
 
+  /**
+   * [영상 올리기]가 설 자리 — 화면 전체에서 딱 하나다.
+   *
+   * 단추를 다는 곳이 둘이라 겹쳤다: 접수 안내 카드(h12)와, 영상 없이 이야기부터
+   * 시작했을 때 서버가 답에 붙여 보내는 단추(h13). 영상을 올리기 전까지는
+   * **대화의 맨 끝**에 있는 AI 말 한 곳만 단추를 맡고, 나머지는 그리지 않는다.
+   *
+   * 올리고 나면 아무도 맡지 않는다 — 대화는 앞으로만 가므로(00 문서 6절)
+   * 다 지난 자리에 단추가 남아 있을 이유가 없다.
+   */
+  const hasVideo =
+    Boolean(item?.video) || chat.messages.some((m) => m.kind === 'video' || m.kind === 'uploading');
+  const uploadCardId = hasVideo
+    ? null
+    : ([...chat.messages]
+        .reverse()
+        .find((m) => m.kind === 'guide' || (m.kind === 'text' && m.role === 'ai'))?.id ?? null);
+
   useEffect(() => {
     messagesRef.current = chat.messages;
   }, [chat.messages]);
@@ -716,6 +735,7 @@ export function CaseWorkspacePage() {
                 key={message.id}
                 message={message}
                 withDisclaimer={message.id === disclaimerCardId}
+                showUpload={message.id === uploadCardId}
                 actions={{
                   onPickVideo: pickVideo,
                   onPickSample: (file) => void pickSample(file),
