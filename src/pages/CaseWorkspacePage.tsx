@@ -67,9 +67,10 @@ export function CaseWorkspacePage() {
   } | null>(null);
   /* F01 영상 뷰어 */
   const [playing, setPlaying] = useState<VideoRef | null>(null);
-  /* 경위서 전문. 카드에는 미리보기만 있어서 열 때 받아 둔다.
+  /* 서류 전문. 카드에는 미리보기만 있어서 열 때 받아 둔다.
      어느 사건 것인지까지 같이 들고 있어서 사건을 바꾸면 저절로 무효가 된다 */
   const [fullDoc, setFullDoc] = useState<{ id: string; doc: Statement } | null>(null);
+  const [fullRebuttal, setFullRebuttal] = useState<{ id: string; doc: Rebuttal } | null>(null);
   /* 팝업 2종도 서랍과 같은 규칙을 쓴다 */
   const [popup, setPopup] = useState<{
     key: string;
@@ -196,13 +197,14 @@ export function CaseWorkspacePage() {
    * 다시 쓰면 버전이 오르므로 열 때마다 새로 받는다.
    */
   const openStatement = useCallback(async () => {
-    setDrawer({ key: viewKey, which: 'statement' });
     try {
       const full = await service.getStatement(caseId);
-      if (activeCase.current === caseId) setFullDoc({ id: caseId, doc: full });
+      if (activeCase.current !== caseId) return;
+      setFullDoc({ id: caseId, doc: full });
     } catch {
-      /* 못 받으면 카드가 아는 만큼만 보인다 */
+      /* 못 받으면 카드가 아는 만큼만 보여 준다 */
     }
+    setDrawer({ key: viewKey, which: 'statement' });
   }, [caseId, viewKey]);
 
   /**
@@ -381,6 +383,7 @@ export function CaseWorkspacePage() {
 
   /** 이 사건의 전문을 받아 뒀나. 아니면 카드가 아는 만큼만 보여 준다 */
   const statementFull = fullDoc?.id === caseId ? fullDoc.doc : null;
+  const rebuttalFull = fullRebuttal?.id === caseId ? fullRebuttal.doc : null;
 
   /** 서류 작업이 도는 동안은 [다시 쓰기]·[만들기]를 잠근다 */
   const rewriting = activeJob?.kind === 'report';
@@ -406,6 +409,23 @@ export function CaseWorkspacePage() {
     },
     [caseId],
   );
+
+  /**
+   * 반박의견서 — 카드에는 본문 미리보기(`bodyPreview`)만 온다. 전문은 열 때 받는다 (명세 G-2).
+   * 받는이·접수번호·첨부 사정(25MB 초과 등)도 여기서 함께 온다.
+   */
+  const openRebuttal = useCallback(async () => {
+    /* **받아 온 뒤에 연다.** 열어 놓고 나중에 갈아 끼우면, 그 사이 사용자가 적어 넣은
+       받는이·접수번호·본문이 새 초안으로 덮여 지워진다 */
+    try {
+      const full = await service.getRebuttal(caseId);
+      if (activeCase.current !== caseId) return;
+      setFullRebuttal({ id: caseId, doc: full });
+    } catch {
+      /* 못 받으면 카드가 아는 만큼만 보여 준다 */
+    }
+    setDrawer({ key: viewKey, which: 'rebuttal' });
+  }, [caseId, viewKey]);
 
   const savePdf = useCallback(async () => {
     await service.downloadStatementPdf(caseId, statementRef.current?.version ?? 1);
@@ -535,7 +555,7 @@ export function CaseWorkspacePage() {
                   onRewriteStatement: () => void rewriteStatement(),
                   statementRewriting: rewriting,
                   onCreateRebuttal: () => void createRebuttal(),
-                  onOpenRebuttal: () => show('rebuttal'),
+                  onOpenRebuttal: () => void openRebuttal(),
                   onOpenProcess: () => pop('process'),
                   onOpenVideo: (video) => void openVideo(video),
                 }}
@@ -566,7 +586,7 @@ export function CaseWorkspacePage() {
             rebuttal={rebuttal}
             showDisclaimer={disclaimerCardId === null}
             onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
-            onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
+            onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
           />
         </div>
       )}
@@ -591,9 +611,9 @@ export function CaseWorkspacePage() {
 
       <RebuttalDialog
         open={openDrawer === 'rebuttal'}
-        doc={rebuttal}
+        doc={rebuttalFull ?? rebuttal}
         /* 서류에 적힌 것이 먼저다. 없으면 사건이 아는 값으로 채운다 */
-        claimNo={rebuttal?.claimNo ?? item?.claimNo ?? null}
+        claimNo={(rebuttalFull ?? rebuttal)?.claimNo ?? item?.claimNo ?? null}
         sending={sending}
         onClose={() => setDrawer(null)}
         onSend={(draft) => setConfirmSend(draft)}
@@ -647,7 +667,7 @@ export function CaseWorkspacePage() {
             rebuttal={rebuttal}
             showDisclaimer={disclaimerCardId === null}
             onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
-            onOpenRebuttal={() => (rebuttal ? show('rebuttal') : void createRebuttal())}
+            onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
           />
         )}
       </Drawer>

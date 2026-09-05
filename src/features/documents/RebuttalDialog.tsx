@@ -61,8 +61,13 @@ export function RebuttalDialog({
     : undefined;
   const claimError =
     touched && REQUIRE_CLAIM_NO && !claimNo.trim() ? '접수번호를 넣어 주세요.' : undefined;
+  /* 보낸 문서는 그대로 보관되고 고칠 수 없다 (명세 G-2 editable · h29 안내) */
+  const alreadySent = doc?.sentAt != null;
   const canSend =
-    EMAIL.test(to.trim()) && (!REQUIRE_CLAIM_NO || claimNo.trim().length > 0) && !sending;
+    EMAIL.test(to.trim()) &&
+    (!REQUIRE_CLAIM_NO || claimNo.trim().length > 0) &&
+    !sending &&
+    !alreadySent;
 
   const send = () => {
     setTouched(true);
@@ -96,7 +101,11 @@ export function RebuttalDialog({
               onClick={send}
               disabled={!canSend}
               lockedReason={
-                !canSend && touched ? '받는이와 접수번호를 채우면 보내기가 열려요.' : undefined
+                alreadySent
+                  ? '보낸 문서는 수정할 수 없어요. 다시 보내려면 새 문서로 만들어요.'
+                  : !canSend && touched
+                    ? '받는이와 접수번호를 채우면 보내기가 열려요.'
+                    : undefined
               }
             >
               {sending ? '보내는 중…' : '보내기'}
