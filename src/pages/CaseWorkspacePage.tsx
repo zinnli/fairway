@@ -114,6 +114,8 @@ export function CaseWorkspacePage() {
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
   /* 화면이 세워 둔 로딩 카드. 작업이 끝나면 치운다 */
   const loadingCardId = useRef<string | null>(null);
+  /** 그 카드가 무슨 일을 기다리는 중인지. 일이 바뀌면 글자도 바뀌어야 한다 */
+  const loadingPhase = useRef<ActiveJob['kind'] | null>(null);
   /* 내가 보낸 글에 대한 답을 기다리는 카드. Job이 없어서 activeJob으로는 못 잡는다 */
   const replyCardId = useRef<string | null>(null);
   /* 카드를 세우기 **전에** 답을 기다리기 시작한다 — 답이 POST 응답보다 먼저 올 수 있다 */
@@ -444,6 +446,7 @@ export function CaseWorkspacePage() {
     let stop: (() => void) | null = null;
     activeCase.current = caseId;
     loadingCardId.current = null;
+    loadingPhase.current = null;
     dropReplyCard();
     fetchedVersion.current = null;
 
@@ -466,7 +469,16 @@ export function CaseWorkspacePage() {
             if (message.role === 'ai') dropReplyCard();
             dispatch({ type: 'append', message });
           },
-          messageUpdated: (message) => dispatch({ type: 'settle', message }),
+          /* 다시 쓴 서류는 제자리에서 바꾸지 않고 대화 끝으로 옮긴다 —
+             저 위에서 조용히 바뀌면 다시 쓴 티가 안 난다 (명세 F-4는 message.updated로 온다) */
+          messageUpdated: (message) =>
+            dispatch({
+              type:
+                message.kind === 'statementDraft' || message.kind === 'rebuttalDraft'
+                  ? 'revise'
+                  : 'settle',
+              message,
+            }),
           caseUpdated: (item, activeJobNow) => {
             setLoaded({ id: caseId, item });
             setActiveJob(activeJobNow);
@@ -499,15 +511,25 @@ export function CaseWorkspacePage() {
   }, [caseId, dropReplyCard, refresh, reloadList]);
 
   /**
-   * 분석 중·판정 중에는 로딩 카드 한 장을 세운다 (04 문서 C6 — 단계 표시는 없다).
+   * 일이 도는 동안 기다림 카드 한 장을 세운다 (04 문서 C6 — 단계 표시는 없다).
    * 서버가 단계를 내려보내지 않으므로 화면이 activeJob만 보고 세웠다 치운다.
+   *
+   * 서류 작업(report·rebuttal)도 세운다. 예전에는 단추 글자만 바뀌었는데,
+   * 그 단추는 저 위 카드에 있어서 대화를 보고 있으면 무슨 일이 도는지 몰랐다.
+   * 단추 잠금은 그대로 둔다 — 두 번 청하는 것은 여전히 막아야 한다.
    */
   useEffect(() => {
-    /* 서류 작업(report·rebuttal)은 카드를 세우지 않는다 — 단추만 잠근다 */
-    const phase =
-      activeJob?.kind === 'analysis' || activeJob?.kind === 'verdict' ? activeJob.kind : null;
-    if (phase && loadingCardId.current === null) {
-      /* 답 대신 분석·판정이 시작된 경우다. 로딩 카드가 두 장 서지 않게 먼저 치운다 */
+    const phase = activeJob?.kind ?? null;
+    if (phase === loadingPhase.current) return;
+
+    /* 일이 바뀌었으면 서 있던 카드부터 내린다 — 안 내리면 분석이 끝나고 판정이
+       도는 동안에도 "영상을 분석하고 있어요"가 그대로 남는다 */
+    if (loadingCardId.current !== null) {
+      dispatch({ type: 'drop', id: loadingCardId.current });
+      loadingCardId.current = null;
+    }
+    if (phase) {
+      /* 답 대신 다른 일이 시작된 경우다. 기다림 카드가 두 장 서지 않게 먼저 치운다 */
       dropReplyCard();
       const id = nextId();
       loadingCardId.current = id;
@@ -516,10 +538,7 @@ export function CaseWorkspacePage() {
         message: { id, at: now(), role: 'ai', kind: 'analyzing', phase },
       });
     }
-    if (!phase && loadingCardId.current !== null) {
-      dispatch({ type: 'drop', id: loadingCardId.current });
-      loadingCardId.current = null;
-    }
+    loadingPhase.current = phase;
   }, [activeJob, dropReplyCard]);
 
   /** 이 사건의 전문을 받아 뒀나. 아니면 카드가 아는 만큼만 보여 준다 */
