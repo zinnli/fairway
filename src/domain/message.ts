@@ -32,8 +32,9 @@ export type ChatMessage = Base &
     /* 올라가는 중에는 그 자리에서 숫자만 바뀌고, 끝나면 video로 갈린다.
        취소·실패는 범위 밖이라 상태가 하나뿐이다 (04 문서 C4) */
     | { role: 'ai'; kind: 'uploading'; fileName: string; sizeBytes: number; progress: number }
-    /* 단계 시각화 없이 로딩 하나 (04 문서 C6). 무슨 일을 기다리는지만 갈린다 */
-    | { role: 'ai'; kind: 'analyzing'; phase?: 'analysis' | 'verdict'; done?: boolean }
+    /* 단계 시각화 없이 로딩 하나 (04 문서 C6). 무슨 일을 기다리는지만 갈린다.
+       'reply'는 Job이 없는 기다림이다 — 되물음·답변은 서버가 Job 없이 SSE로 보낸다 */
+    | { role: 'ai'; kind: 'analyzing'; phase?: 'analysis' | 'verdict' | 'reply'; done?: boolean }
     | { role: 'ai'; kind: 'verdict'; verdict: Verdict }
     | { role: 'ai'; kind: 'statementDraft'; doc: Statement }
     | { role: 'ai'; kind: 'rebuttalDraft'; doc: Rebuttal }

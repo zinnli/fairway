@@ -106,6 +106,8 @@ export function CaseWorkspacePage() {
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
   /* 화면이 세워 둔 로딩 카드. 작업이 끝나면 치운다 */
   const loadingCardId = useRef<string | null>(null);
+  /* 내가 보낸 글에 대한 답을 기다리는 카드. Job이 없어서 activeJob으로는 못 잡는다 */
+  const replyCardId = useRef<string | null>(null);
   /* 콜백 안에서 지금 서류가 있는지 봐야 한다 */
   const statementRef = useRef<Statement | null>(null);
   /* 지금 보고 있는 사건. 업로드·분석이 도는 동안 사건을 바꾸면
@@ -122,6 +124,12 @@ export function CaseWorkspacePage() {
     void reloadList();
     return fresh;
   }, [caseId, reloadList]);
+
+  const dropReplyCard = useCallback(() => {
+    if (replyCardId.current === null) return;
+    dispatch({ type: 'drop', id: replyCardId.current });
+    replyCardId.current = null;
+  }, []);
 
   /* 화면이 잠깐 세워 두는 카드 (업로드 중·분석 중). 서버 로그에는 남지 않는다 */
   const put = useCallback((body: MessageBody) => {
@@ -351,11 +359,27 @@ export function CaseWorkspacePage() {
    * 입력창 전용. 되물음에 대한 답도 이 길로 간다 — 답변 전용 API는 없다.
    * 돌려받는 건 내가 친 글 한 장뿐이고, AI 답과 판정 카드는 이벤트로 들어온다.
    */
+  /**
+   * 글 보내기 — 내가 친 글 한 장만 돌아오고 **답은 SSE로 따로 온다** (명세 C-2).
+   *
+   * 그 사이가 비어 있으면 답하는 중인지 알 수 없다. 되물음·답변은 Job을 만들지
+   * 않으므로(명세 §1.1 — Agent 호출 뒤 바로 SSE) activeJob으로는 잡히지 않는다.
+   * 그래서 여기서 직접 기다림 카드를 세우고, 답이 오면 치운다.
+   */
   const sendText = useCallback(
     async (text: string) => {
       const mine = await service.sendMessage(caseId, text);
       if (activeCase.current !== caseId) return;
       dispatch({ type: 'append', message: mine });
+
+      if (replyCardId.current === null) {
+        const id = nextId();
+        replyCardId.current = id;
+        dispatch({
+          type: 'append',
+          message: { id, at: now(), role: 'ai', kind: 'analyzing', phase: 'reply' },
+        });
+      }
     },
     [caseId],
   );
@@ -370,6 +394,7 @@ export function CaseWorkspacePage() {
     let stop: (() => void) | null = null;
     activeCase.current = caseId;
     loadingCardId.current = null;
+    replyCardId.current = null;
 
     Promise.all([service.getCase(caseId), service.listMessages(caseId)])
       .then(([{ item: c, activeJob: job }, past]) => {
@@ -385,7 +410,11 @@ export function CaseWorkspacePage() {
 
         stop = service.subscribe(caseId, {
           /* 같은 카드가 두 번 오는 것은 reducer가 id로 막는다 */
-          message: (message) => dispatch({ type: 'append', message }),
+          message: (message) => {
+            /* 답이 도착했다 — 기다림 카드를 먼저 치워야 새 카드가 맨 아래에 붙는다 */
+            if (message.role === 'ai') dropReplyCard();
+            dispatch({ type: 'append', message });
+          },
           messageUpdated: (message) => dispatch({ type: 'settle', message }),
           caseUpdated: (item, activeJobNow) => {
             setLoaded({ id: caseId, item });
@@ -416,7 +445,7 @@ export function CaseWorkspacePage() {
       alive = false;
       stop?.();
     };
-  }, [caseId, refresh, reloadList]);
+  }, [caseId, dropReplyCard, refresh, reloadList]);
 
   /**
    * 분석 중·판정 중에는 로딩 카드 한 장을 세운다 (04 문서 C6 — 단계 표시는 없다).
@@ -427,6 +456,8 @@ export function CaseWorkspacePage() {
     const phase =
       activeJob?.kind === 'analysis' || activeJob?.kind === 'verdict' ? activeJob.kind : null;
     if (phase && loadingCardId.current === null) {
+      /* 답 대신 분석·판정이 시작된 경우다. 로딩 카드가 두 장 서지 않게 먼저 치운다 */
+      dropReplyCard();
       const id = nextId();
       loadingCardId.current = id;
       dispatch({
@@ -438,7 +469,7 @@ export function CaseWorkspacePage() {
       dispatch({ type: 'drop', id: loadingCardId.current });
       loadingCardId.current = null;
     }
-  }, [activeJob]);
+  }, [activeJob, dropReplyCard]);
 
   /** 이 사건의 전문을 받아 뒀나. 아니면 카드가 아는 만큼만 보여 준다 */
   const statementFull = fullDoc?.id === caseId ? fullDoc.doc : null;
