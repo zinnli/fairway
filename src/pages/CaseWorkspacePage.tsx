@@ -427,9 +427,21 @@ export function CaseWorkspacePage() {
     setDrawer({ key: viewKey, which: 'rebuttal' });
   }, [caseId, viewKey]);
 
+  /**
+   * PDF 받기 — 서버가 만들고(F-5) 인증을 붙여 받는다(F-6).
+   * 실패 **화면**(h32)은 9/3에 빠졌지만, 명세 F-5가 서버 message를 기본 팝업으로
+   * 띄우라고 못 박아 뒀다. 조용히 끝나면 이름만 .pdf인 파일이 떨어진 줄도 모른다.
+   */
   const savePdf = useCallback(async () => {
-    await service.downloadStatementPdf(caseId, statementRef.current?.version ?? 1);
-  }, [caseId]);
+    const run = async () => {
+      try {
+        await service.downloadStatementPdf(caseId, statementRef.current?.version ?? 1);
+      } catch (e) {
+        showFailure(e, () => void run());
+      }
+    };
+    await run();
+  }, [caseId, showFailure]);
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' });

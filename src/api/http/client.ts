@@ -159,6 +159,53 @@ export function upload<T>(
   });
 }
 
+/**
+ * 파일 하나를 받아 온다 — PDF처럼 본문이 JSON이 아닌 길 (명세 F-6).
+ *
+ * **인증 헤더를 반드시 붙인다.** 액세스 토큰은 메모리에만 있어서 쿠키로 가지 않는다.
+ * 안 붙이면 서버가 401 JSON을 주는데, 그걸 그대로 저장하면 이름만 .pdf인
+ * "받아지긴 했는데 열리지 않는" 파일이 떨어진다.
+ *
+ * `url`은 절대 주소다 — 서버가 준 downloadUrl을 그대로 쓰기 위해서다.
+ */
+export async function downloadFile(url: string): Promise<Blob> {
+  const run = async () => {
+    const token = getToken();
+    try {
+      return await fetch(url, {
+        credentials: 'include',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      });
+    } catch {
+      throw new NetworkError();
+    }
+  };
+
+  let res = await run();
+  if (res.status === 401) {
+    const revived = await refreshOnce();
+    if (revived) {
+      res = await run();
+    } else {
+      setToken(null);
+      onSessionLost?.();
+    }
+  }
+
+  if (!res.ok) {
+    const text = await res.text();
+    let data: unknown = null;
+    /* 오류 본문이 JSON이 아닐 수도 있다 (프록시가 낸 HTML 등) */
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
+    }
+    throw new ApiError(res.status, parseErrorBody(res.status, data));
+  }
+  return res.blob();
+}
+
 /** SSE처럼 fetch 밖에서 토큰이 만료됐을 때 쓴다. 위와 같은 single-flight를 탄다 */
 export const refreshAccessToken = () => refreshOnce();
 
