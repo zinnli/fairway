@@ -20,6 +20,7 @@ export function Dialog({
   footer,
   width = 560,
   bodyClass = 'px-8 py-6',
+  dismissible = true,
 }: {
   open: boolean;
   onClose: () => void;
@@ -34,6 +35,12 @@ export function Dialog({
   width?: number;
   /** 본문 여백 — 시안마다 다르다 (h30은 32/40) */
   bodyClass?: string;
+  /**
+   * 닫을 수 있는가. false면 나가는 길 **셋을 모두** 막는다 — ×·Esc·바깥 닫힘.
+   * 되돌릴 수 없는 일이 도는 동안 쓴다 (메일 발송은 동기라 1~3초 걸린다).
+   * 하나만 막으면 나머지로 빠져나가 결과를 모르는 채로 남는다.
+   */
+  dismissible?: boolean;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
   const titleId = useId();
@@ -48,10 +55,11 @@ export function Dialog({
   return (
     <dialog
       ref={ref}
-      onClose={onClose}
+      onClose={dismissible ? onClose : undefined}
       onCancel={(e) => {
+        /* Esc는 언제나 기본 닫힘을 막는다 — 닫을지는 우리가 정한다 */
         e.preventDefault();
-        onClose();
+        if (dismissible) onClose();
       }}
       aria-labelledby={titleId}
       className="m-auto w-[calc(100vw-32px)] rounded-lg bg-surface p-0 text-ink backdrop:bg-[rgba(15,18,24,.55)]"
@@ -68,7 +76,7 @@ export function Dialog({
             </h2>
             {badge}
           </div>
-          <Button variant="icon" onClick={onClose} aria-label="닫기">
+          <Button variant="icon" onClick={onClose} aria-label="닫기" disabled={!dismissible}>
             <Icon name="close" size={16} />
           </Button>
         </header>
