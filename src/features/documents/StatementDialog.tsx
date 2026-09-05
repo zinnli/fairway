@@ -103,8 +103,14 @@ export function StatementDialog({
               </Button>
             </div>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
+              {/*
+                시안 h30은 `1 / 2쪽`이라고 적어 뒀지만 쪽을 넘기는 장치가 없다 —
+                같은 화면의 핸드오프 주석대로 본문은 한 줄기로 이어지고 이 칸만 스크롤한다.
+                그래서 `1 /`은 늘 1이고, 없는 조작이 있는 것처럼 읽힌다. 숫자만 남긴다.
+                (장수 자체는 서버가 만든 PDF를 센 값이다 — 못 받으면 지어내지 않고 숨긴다)
+              */}
               {doc.pageCount > 0 && (
-                <span className="tnum text-[12.5px] text-muted">1 / {doc.pageCount}쪽</span>
+                <span className="tnum text-[12.5px] text-muted">{doc.pageCount}쪽</span>
               )}
               <span className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</span>
             </div>
