@@ -14,7 +14,12 @@ export const VIDEO_LIMITS = {
   maxBytes: 200 * 1024 * 1024,
   maxSeconds: 180,
   accept: ['video/mp4', 'video/quicktime', 'video/x-msvideo'],
-  acceptLabel: 'mp4 권장 (avi·mov 허용) · 최대 200MB · 3분',
+  /**
+   * 안내 카드(h12)에서 앞 문장과 **한 줄**로 붙는다. 시안(10_디자인.html #h12)의 문구
+   * 그대로다 — `(avi·mov 허용)`을 덧붙였더니 548px이 되어 532px 칸을 넘고 줄이 접혔다.
+   * 지금은 493px. 받는 형식은 위 `accept`가 정하므로 mov·avi는 그대로 올라간다.
+   */
+  acceptLabel: 'mp4 권장 · 최대 200MB · 3분 이내',
 } as const;
 
 /**
