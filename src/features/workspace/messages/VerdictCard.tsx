@@ -4,6 +4,7 @@ import { Icon } from '@/components/ui/Icon';
 import { RatioBar } from '@/components/ui/RatioBar';
 import { APP_NAME, DISCLAIMER } from '@/config';
 import { formatRatio, type Precedent, type Verdict } from '@/domain/verdict';
+import { breakSentences } from '@/lib/format';
 
 /**
  * 판정 — h21. 61화면의 기준 화면이다.
@@ -53,7 +54,14 @@ export function VerdictCard({
         {ratio.opponent}
       </p>
 
-      <p className="text-[15px] leading-[1.6] text-ink">{verdict.conclusion}</p>
+      {/*
+        한 줄 결론 — 서버가 문장 둘을 붙여 보낼 때가 있다("…일방과실이에요. 내 차가…").
+        온점 뒤에서 끊어 문장마다 한 줄로 둔다. 이미 끊겨 왔으면 손대지 않는다.
+        판정 카드에서만 하는 일이다 — 대화의 다른 말은 온 그대로 보여 준다.
+      */}
+      <p className="text-[15px] leading-[1.6] whitespace-pre-line text-ink">
+        {breakSentences(verdict.conclusion)}
+      </p>
 
       {/*
         비율 막대 — 시안 h23. 상대 보험사가 주장하는 비율을 사용자가 대화에서
