@@ -91,29 +91,37 @@ export function VerdictCard({
       </div>
 
       {/*
-        판정 카드는 대화에 그대로 남는다. 경위서를 만든 뒤에도 "만들기"라고 적혀 있으면
-        한 장 더 만들어지는 줄 안다 — 이미 있으면 **하는 일 그대로** [보기]로 바꾼다.
-        잠긴 회색 단추로 두지 않는 이유: 현황판의 서류 줄도 같은 규칙이다
-        ("눌리지 않는 줄을 만들지 않는다"). 누르면 전문이 열리므로 할 일이 남아 있다.
+        이 단추는 상설 창구가 아니라 **다음 걸음 안내**다 — "판정이 끝났으니 경위서를
+        만드세요". 걸음을 디디고 나면 역할이 끝나므로 내지 않는다.
+
+        막다른 곳에 두지 않는다: 여기서 보는 `statementExists`는 곧
+        `lastOf('statementDraft')`, 즉 **대화에 초안 카드가 있느냐**다. 이 단추가
+        사라지는 순간은 [전문 보기]·[다시 쓰기]·[PDF 받기]를 단 h26 카드가
+        대화에 붙어 있는 순간이고, 현황판의 서류 줄도 늘 열려 있다.
+        대화는 앞으로만 가므로(00 문서 6절) 할 일은 맨 아래에 있어야 한다.
+
+        만드는 중 표시는 남긴다 — 누른 뒤 카드가 붙기 전까지가 비면 눌린 줄 모른다.
       */}
-      <Button
-        size="lg"
-        className="mt-1 self-start"
-        onClick={onCreateStatement}
-        disabled={statementBusy}
-      >
-        {statementBusy ? (
-          <>
-            사건경위서 만드는 중
-            <Dots />
-          </>
-        ) : (
-          <>
-            {statementExists ? '사건경위서 보기' : '사건경위서 만들기'}
-            <span aria-hidden>→</span>
-          </>
-        )}
-      </Button>
+      {!statementExists && (
+        <Button
+          size="lg"
+          className="mt-1 self-start"
+          onClick={onCreateStatement}
+          disabled={statementBusy}
+        >
+          {statementBusy ? (
+            <>
+              사건경위서 만드는 중
+              <Dots />
+            </>
+          ) : (
+            <>
+              사건경위서 만들기
+              <span aria-hidden>→</span>
+            </>
+          )}
+        </Button>
+      )}
 
       {withDisclaimer && <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>}
     </div>
