@@ -60,7 +60,7 @@ export function StatementDialog({
       onClose={onClose}
       title="사건경위서"
       width={760}
-      bodyClass="px-10 py-8"
+      bodyClass="px-5 py-6 sm:px-10 sm:py-8"
       icon={
         <span className="flex shrink-0 text-muted" aria-hidden>
           <Icon name="file" size={20} />
