@@ -38,7 +38,9 @@ export function StatementDraftCard({
       <div className="flex flex-wrap items-baseline gap-2">
         <p className="text-[15px] font-semibold text-ink">사건경위서 초안이 준비됐어요</p>
         <p className="text-[12.5px] font-medium text-muted">
-          {versionLabel(doc.version)} · {doc.pageCount}장
+          {versionLabel(doc.version)}
+          {/* 장수는 서버가 만든 PDF를 세어 준 값이다. 못 받으면 지어내지 않고 숨긴다 */}
+          {doc.pageCount > 0 && ` · ${doc.pageCount}장`}
         </p>
       </div>
 

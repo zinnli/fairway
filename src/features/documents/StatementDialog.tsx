@@ -99,7 +99,9 @@ export function StatementDialog({
               </Button>
             </div>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="tnum text-[12.5px] text-muted">1 / {doc.pageCount}쪽</span>
+              {doc.pageCount > 0 && (
+                <span className="tnum text-[12.5px] text-muted">1 / {doc.pageCount}쪽</span>
+              )}
               <span className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</span>
             </div>
           </div>
