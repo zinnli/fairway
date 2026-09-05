@@ -122,6 +122,7 @@ export function toVerdict(v: VerdictPayloadDto): Verdict {
     ratio,
     conclusion: v.summary,
     chartName: v.basis.chart.name,
+    chartNote: v.basis.chart.note || null,
     /* ★ 도표 번호는 여전히 미확정이다. 서버도 이름과 설명만 준다 */
     chartNo: null,
     /* ★ 서버는 기본 비율·가감 항목을 주지 않는다. 화면에서 쓰는 곳이 없다 */

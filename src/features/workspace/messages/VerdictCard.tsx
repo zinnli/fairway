@@ -59,14 +59,32 @@ export function VerdictCard({
       <div className="flex flex-col gap-1">
         <p className="text-[12px] font-semibold text-muted">근거</p>
 
-        {/* 도표는 글 한 줄로만 남는다 — 팝업(h38)은 9/3에 빠졌다 */}
-        <div className="flex items-center gap-2 px-2 py-2 text-[13.5px]">
-          <span className="flex shrink-0 text-muted" aria-hidden>
+        {/*
+          도표 줄과 심의사례 줄은 시안에서 **같은 상자**다
+          (gap 8 · padding 8/8 · margin 0 -8 · radius 8). -mx-2가 빠져 있어서
+          이 줄만 8px 오른쪽으로 밀려 있었다. 높이(min-h-11)와 오른쪽 여백도 맞춘다.
+          누를 수는 없다 — 도표 팝업(h38)은 9/3에 빠졌다.
+        */}
+        <div className="-mx-2 flex min-h-11 items-start gap-2 px-2 py-2 text-[13.5px]">
+          {/* 두 줄일 때 아이콘이 첫 줄에 서게 한다 — h-5가 13.5px 글자의 줄 높이다 */}
+          <span className="flex h-5 shrink-0 items-center text-muted" aria-hidden>
             <Icon name="file" size={14} />
           </span>
-          <span className="min-w-0 flex-1 text-ink">
-            인정기준 도표
-            {verdict.chartNo && <span className="tnum"> {verdict.chartNo}</span>} — {verdict.chartName}
+          <span className="min-w-0 flex-1">
+            <span className="block text-ink">
+              인정기준 도표
+              {verdict.chartNo && <span className="tnum"> {verdict.chartNo}</span>} —{' '}
+              {verdict.chartName}
+            </span>
+            {verdict.chartNote && (
+              <span className="block text-[12.5px] leading-[1.5] text-muted">
+                {verdict.chartNote}
+              </span>
+            )}
+          </span>
+          {/* 심의사례 줄의 chevron 자리를 비워 둬야 글자 폭이 같아진다 */}
+          <span className="invisible flex h-5 shrink-0 items-center" aria-hidden>
+            <Icon name="chevronRight" size={14} />
           </span>
         </div>
 

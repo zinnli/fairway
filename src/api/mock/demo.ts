@@ -62,6 +62,7 @@ export const DEMO_QUESTIONS = [
 export const DEMO_VERDICT: Verdict = {
   ratio: { mine: 0, opponent: 100 },
   chartName: '신호기 있는 교차로 · 신호위반',
+  chartNote: '사고 유형별 기본 비율을 정해 둔 표 · 차대이륜차 편',
   chartNo: null,
   baseRatio: { mine: 0, opponent: 100 },
   adjustments: [],

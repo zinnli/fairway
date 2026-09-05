@@ -56,6 +56,7 @@ function caseWithRatio(c: CaseDto): Case {
     ratio,
     conclusion: '',
     chartName: '',
+    chartNote: null,
     chartNo: null,
     baseRatio: ratio,
     adjustments: [],

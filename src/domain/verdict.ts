@@ -32,8 +32,10 @@ export interface Precedent {
  */
 export interface Verdict {
   ratio: Ratio;
-  /** 인정기준 도표 — 팝업 없이 근거 목록의 글 한 줄로만 쓴다 */
+  /** 인정기준 도표 — 팝업 없이 근거 목록의 줄 하나로만 쓴다 (h38은 9/3 제외) */
   chartName: string;
+  /** 도표가 무엇인지 한 줄 설명. 서버가 준다(basis.chart.note). 없으면 줄을 숨긴다 */
+  chartNote: string | null;
   /** ★ 번호 미확정 (00 문서 5절). null이면 화면에서 번호 칸을 숨긴다 */
   chartNo: string | null;
   baseRatio: Ratio;
