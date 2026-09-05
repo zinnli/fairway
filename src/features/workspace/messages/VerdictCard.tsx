@@ -1,3 +1,4 @@
+import { Dots } from '@/components/ui/Dots';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { DISCLAIMER } from '@/config';
@@ -15,11 +16,18 @@ export function VerdictCard({
   verdict,
   onOpenPrecedent,
   onCreateStatement,
+  statementExists,
+  statementBusy,
   withDisclaimer,
 }: {
   verdict: Verdict;
   onOpenPrecedent: (precedent: Precedent) => void;
+  /** 이미 있으면 만들지 않고 연다 (작업 화면이 갈라 준다) */
   onCreateStatement: () => void;
+  /** 경위서가 이미 있는가. 대화는 앞으로만 가서 이 카드가 계속 남아 있다 */
+  statementExists?: boolean;
+  /** 지금 만들거나 다시 쓰는 중 */
+  statementBusy?: boolean;
   withDisclaimer?: boolean;
 }) {
   const { ratio } = verdict;
@@ -82,9 +90,29 @@ export function VerdictCard({
         ))}
       </div>
 
-      <Button size="lg" className="mt-1 self-start" onClick={onCreateStatement}>
-        사건경위서 만들기
-        <span aria-hidden>→</span>
+      {/*
+        판정 카드는 대화에 그대로 남는다. 경위서를 만든 뒤에도 "만들기"라고 적혀 있으면
+        한 장 더 만들어지는 줄 안다 — 이미 있으면 **하는 일 그대로** [보기]로 바꾼다.
+        잠긴 회색 단추로 두지 않는 이유: 현황판의 서류 줄도 같은 규칙이다
+        ("눌리지 않는 줄을 만들지 않는다"). 누르면 전문이 열리므로 할 일이 남아 있다.
+      */}
+      <Button
+        size="lg"
+        className="mt-1 self-start"
+        onClick={onCreateStatement}
+        disabled={statementBusy}
+      >
+        {statementBusy ? (
+          <>
+            사건경위서 만드는 중
+            <Dots label="사건경위서 만드는 중" />
+          </>
+        ) : (
+          <>
+            {statementExists ? '사건경위서 보기' : '사건경위서 만들기'}
+            <span aria-hidden>→</span>
+          </>
+        )}
       </Button>
 
       {withDisclaimer && <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>}

@@ -650,6 +650,7 @@ export function CaseWorkspacePage() {
                   sampleLoading: fetchingSample,
                   onOpenPrecedent: (p) => pop('precedent', p),
                   onCreateStatement: () => void createStatement(),
+                  statementExists: statement !== null,
                   onOpenStatement: () => void openStatement(),
                   onPrintStatement: () => void savePdf(),
                   onRewriteStatement: () => void rewriteStatement(),

@@ -21,6 +21,8 @@ export interface MessageActions {
   sampleLoading?: boolean;
   onOpenPrecedent: (precedent: Precedent) => void;
   onCreateStatement: () => void;
+  /** 경위서가 이미 있는가 — 판정 카드의 단추가 [만들기]/[보기]로 갈린다 */
+  statementExists?: boolean;
   onOpenStatement: () => void;
   onPrintStatement: () => void;
   onRewriteStatement: () => void;
@@ -95,6 +97,8 @@ export function MessageItem({
           verdict={message.verdict}
           onOpenPrecedent={actions.onOpenPrecedent}
           onCreateStatement={actions.onCreateStatement}
+          statementExists={actions.statementExists}
+          statementBusy={actions.statementRewriting}
           withDisclaimer={withDisclaimer}
         />
       );
