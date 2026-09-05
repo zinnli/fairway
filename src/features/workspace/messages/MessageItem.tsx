@@ -30,6 +30,8 @@ export interface MessageActions {
   /** 다시 쓰는 중인가 (h31 진행 화면이 없어서 단추로만 알린다) */
   statementRewriting?: boolean;
   onCreateRebuttal: () => void;
+  /** 반박의견서 초안이 이미 있는가 — 있으면 [반박의견서 만들기]를 내린다 */
+  rebuttalExists?: boolean;
   onOpenRebuttal: () => void;
   onOpenProcess: () => void;
   onOpenVideo: (video: VideoRef) => void;
@@ -89,7 +91,12 @@ export function MessageItem({
               loading={actions.sampleLoading}
             />
           )}
-          {message.cta && !uploadCta && (
+          {/*
+            [사건경위서 먼저 만들기] — h27. 반박의견서가 잠겨 있을 때 서버가 길을 알려 준다.
+            경위서가 생기면 그 길은 이미 지났으므로 내린다. 판정 카드의 [사건경위서 만들기]와
+            같은 이치다 — 다음 걸음 안내이지 상설 창구가 아니다.
+          */}
+          {message.cta && !uploadCta && !actions.statementExists && (
             <Button className="mt-1 self-start" onClick={actions.onCreateStatement}>
               {message.cta.label}
             </Button>
@@ -134,6 +141,7 @@ export function MessageItem({
           onRewrite={actions.onRewriteStatement}
           rewriting={actions.statementRewriting}
           onCreateRebuttal={actions.onCreateRebuttal}
+          rebuttalExists={actions.rebuttalExists}
           withDisclaimer={withDisclaimer}
         />
       );

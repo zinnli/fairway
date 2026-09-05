@@ -23,6 +23,7 @@ export function StatementDraftCard({
   onRewrite,
   rewriting,
   onCreateRebuttal,
+  rebuttalExists,
   withDisclaimer,
 }: {
   doc: Statement;
@@ -32,6 +33,8 @@ export function StatementDraftCard({
   /** 다시 쓰는 중. 진행 화면(h31)이 없어서 단추 하나로만 알린다 */
   rewriting?: boolean;
   onCreateRebuttal: () => void;
+  /** 반박의견서 초안이 이미 있는가. 대화는 앞으로만 가서 이 카드가 계속 남아 있다 */
+  rebuttalExists?: boolean;
   withDisclaimer?: boolean;
 }) {
   return (
@@ -80,9 +83,20 @@ export function StatementDraftCard({
           PDF 받기
         </Button>
       </div>
-      <Button className="self-start" onClick={onCreateRebuttal}>
-        반박의견서 만들기
-      </Button>
+      {/*
+        판정 카드의 [사건경위서 만들기]와 같은 규칙이다 — 다음 걸음 안내이지 상설
+        창구가 아니라, 초안이 생기면 걸음을 디딘 것이므로 내린다.
+
+        내리지 않으면 위험하기도 하다: G-1은 "이미 있음"을 막지 않아서 한 번 더
+        누르면 초안이 새로 만들어지고, 적어 둔 받는 이·접수번호가 함께 날아간다.
+
+        길이 막히지는 않는다 — 초안 카드(h28)와 현황판의 서류 줄이 남아 있다.
+      */}
+      {!rebuttalExists && (
+        <Button className="self-start" onClick={onCreateRebuttal}>
+          반박의견서 만들기
+        </Button>
+      )}
 
       {withDisclaimer && (
         <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>

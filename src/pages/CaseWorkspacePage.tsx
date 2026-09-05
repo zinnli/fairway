@@ -635,6 +635,9 @@ export function CaseWorkspacePage() {
     null;
   const statement = lastOf('statementDraft')?.doc ?? null;
   const rebuttal = lastOf('rebuttalDraft')?.doc ?? null;
+  /* 만들기 단추를 내리는 기준은 셋 다 같다 — **초안 카드가 대화에 붙었는가**.
+     보낸 뒤에도 초안 카드는 로그에 남으므로 그대로 내려가 있다 */
+  const rebuttalExists = rebuttal !== null;
   /* 참고용 고지는 화면당 한 번(규칙 0.2). 판정·경위서 카드가 이미 달고 나온다 */
   const disclaimerCardId =
     [...chat.messages]
@@ -779,6 +782,7 @@ export function CaseWorkspacePage() {
                   onRewriteStatement: () => void rewriteStatement(),
                   statementRewriting: rewriting,
                   onCreateRebuttal: () => void createRebuttal(),
+                  rebuttalExists,
                   onOpenRebuttal: () => void openRebuttal(),
                   onOpenProcess: () => pop('process'),
                   onOpenVideo: (video) => void openVideo(video),
