@@ -277,35 +277,52 @@ export function CaseWorkspacePage() {
    * 서류 만들기 — 셋 다 "청하고 끝"이다. 202만 오고 **카드는 이벤트로 들어온다.**
    * 도는 동안은 activeJob이 서 있어서 단추가 잠긴다.
    */
+  /**
+   * 서류 작업을 청하고 **누른 즉시 잠근다.**
+   *
+   * 서버는 202만 주고 진행 상태는 `case.updated`로 뒤늦게 온다. 그때까지 기다리면
+   * 누른 티가 안 나는데, 서류 작업은 로딩 카드도 세우지 않아서(04 문서 — h31 제외)
+   * 알릴 곳이 단추뿐이다. 그래서 activeJob을 먼저 세우고, 실패하면 도로 내린다.
+   */
+  const runDocJob = useCallback(
+    async (kind: 'report' | 'rebuttal', call: () => Promise<void>) => {
+      /* [다시 시도]가 같은 길을 그대로 다시 타도록 안쪽에 둔다 */
+      const go = async () => {
+        setActiveJob({ kind });
+        try {
+          await call();
+        } catch (e) {
+          if (activeCase.current !== caseId) return;
+          setActiveJob(null);
+          showFailure(e, () => void go());
+        }
+      };
+      await go();
+    },
+    [caseId, showFailure],
+  );
+
   const createStatement = useCallback(async () => {
     /* 판정 카드와 현황판 두 곳에서 부른다. 이미 있으면 새로 만들지 않고 연다 */
     if (statementRef.current) {
       void openStatement();
       return;
     }
-    try {
-      await service.createStatement(caseId);
-    } catch (e) {
-      showFailure(e, () => void service.createStatement(caseId));
-    }
-  }, [caseId, openStatement, showFailure]);
+    await runDocJob('report', () => service.createStatement(caseId));
+  }, [caseId, openStatement, runDocJob]);
 
   /* 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드가 아래에 붙는다 */
   const rewriteStatement = useCallback(
-    async (instruction?: string) => {
-      await service.reviseStatement(caseId, instruction ?? '');
-    },
-    [caseId],
+    async (instruction?: string) =>
+      runDocJob('report', () => service.reviseStatement(caseId, instruction ?? '')),
+    [caseId, runDocJob],
   );
 
-  const createRebuttal = useCallback(async () => {
-    try {
-      await service.createRebuttal(caseId);
-    } catch (e) {
-      /* 잠겨 있으면 서버가 [사건경위서 먼저 만들기]까지 지정해 준다 (G-1) */
-      showFailure(e, () => void service.createRebuttal(caseId));
-    }
-  }, [caseId, showFailure]);
+  /* 잠겨 있으면 서버가 [사건경위서 먼저 만들기]까지 지정해 준다 (G-1) */
+  const createRebuttal = useCallback(
+    async () => runDocJob('rebuttal', () => service.createRebuttal(caseId)),
+    [caseId, runDocJob],
+  );
 
   const sendRebuttal = useCallback(
     async (draft: Rebuttal) => {
@@ -531,6 +548,35 @@ export function CaseWorkspacePage() {
     statementRef.current = statement;
   }, [statement]);
 
+  /**
+   * 다시 쓰기는 UPDATE가 아니라 **새 버전 INSERT**다 (명세 F-2). 끝나면 카드가 한 장 더 붙는다.
+   * 그때 손에 든 전문(statementFull)은 이전 버전이라, 그대로 두면 전문 모달이
+   * 계속 옛 글을 보여 준다 — 카드가 더 새것이면 그쪽을 보여 주고 전문은 다시 받아 온다.
+   */
+  const statementShown =
+    statementFull && (!statement || statementFull.version >= statement.version)
+      ? statementFull
+      : statement;
+
+  useEffect(() => {
+    const version = statement?.version;
+    if (openDrawer !== 'statement' || version === undefined) return;
+    if (statementFull && statementFull.version >= version) return;
+
+    let alive = true;
+    service
+      .getStatement(caseId)
+      .then((full) => {
+        if (alive && activeCase.current === caseId) setFullDoc({ id: caseId, doc: full });
+      })
+      .catch(() => {
+        /* 못 받아도 카드가 받쳐 준다 (statementShown) */
+      });
+    return () => {
+      alive = false;
+    };
+  }, [caseId, openDrawer, statement, statementFull]);
+
   const notFound = loaded?.id === caseId && loaded.item === null;
 
   if (notFound) {
@@ -551,8 +597,8 @@ export function CaseWorkspacePage() {
   return (
     <>
       {/* 인쇄할 때는 화면 껍데기를 통째로 감추고 서류만 남긴다 (html2canvas 금지) */}
-      {(statementFull ?? statement) && item && (
-        <PrintableStatement doc={(statementFull ?? statement)!} title={item.title ?? '새 사건'} />
+      {statementShown && item && (
+        <PrintableStatement doc={statementShown} title={item.title ?? '새 사건'} />
       )}
       <div className="flex h-dvh bg-bg-3 print:hidden">
       {/* 1024 이상에서만 붙박이. 그 아래는 왼쪽 서랍이 같은 부품을 쓴다 */}
@@ -656,7 +702,7 @@ export function CaseWorkspacePage() {
 
       <StatementDialog
         open={openDrawer === 'statement'}
-        doc={statementFull ?? statement}
+        doc={statementShown}
         onRewrite={(instruction) => void rewriteStatement(instruction)}
         rewriting={rewriting}
         onClose={() => setDrawer(null)}
