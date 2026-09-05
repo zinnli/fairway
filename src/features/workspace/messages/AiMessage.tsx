@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { splitQuestionCount } from '@/lib/format';
 
 /**
  * AI가 하는 말의 공통 껍데기 — 말풍선이 아니라 방패 아이콘 + 왼쪽 여백 28이다.
@@ -17,9 +18,24 @@ export function AiMessage({ children, className }: { children: ReactNode; classN
   );
 }
 
-/** AI 본문 한 줄 */
+/**
+ * AI 본문 한 줄.
+ *
+ * 되물음 끝에 붙는 순번("1/2")은 질문이 아니라 진행 표시라서, 본문에서 떼어
+ * **정보 글자**로 돌린다 — muted 13.5px · tnum (시안 h20b가 같은 값으로 그려 뒀다).
+ * 폭이 고정되는 tnum이라 1/2와 2/2가 같은 자리에 선다.
+ */
 export function AiText({ children }: { children: ReactNode }) {
-  return <p className="text-[15px] leading-[1.6] text-ink">{children}</p>;
+  const body = typeof children === 'string' ? splitQuestionCount(children) : null;
+
+  return (
+    <p className="text-[15px] leading-[1.6] text-ink">
+      {body ? body.body : children}
+      {body?.count && (
+        <span className="tnum ml-1 text-[13.5px] font-normal text-muted">{body.count}</span>
+      )}
+    </p>
+  );
 }
 
 /** 본문 아래 붙는 작은 설명 — 정보 글자라 muted까지만 */

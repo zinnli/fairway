@@ -16,3 +16,16 @@ export function durationLabel(sec: number): string {
   const rest = total % 60;
   return rest === 0 ? `${m}분` : `${m}분 ${rest}초`;
 }
+
+/**
+ * AI 되물음 끝에 붙는 순번을 떼어 낸다 — "…충돌했나요? 1/2" (h20b · 명세 §4).
+ * 서버가 순번을 **문장 안에** 넣어 보내므로, 화면이 갈라서 정보 글자로 돌린다.
+ *
+ * 한 자리 수 두 개가 문장 맨 끝에 올 때만 순번으로 본다. 날짜(09/06)나
+ * 앞뒤가 뒤집힌 값(3/2)을 순번으로 잘못 읽지 않게 막는다.
+ */
+export function splitQuestionCount(text: string): { body: string; count: string | null } {
+  const m = /\s*\(?([1-9])\s*\/\s*([1-9])\)?[.\s]*$/.exec(text);
+  if (!m || Number(m[1]) > Number(m[2])) return { body: text, count: null };
+  return { body: text.slice(0, m.index).trimEnd(), count: `${m[1]}/${m[2]}` };
+}
