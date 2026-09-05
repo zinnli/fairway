@@ -130,20 +130,53 @@ export function CaseWorkspacePage() {
     return id;
   }, []);
 
+  /* 올라가던 카드를 진행 카드 자리에 그대로 세워 둔다 */
+  const showUploading = useCallback(
+    (id: string, fileName: string, sizeBytes: number) =>
+      dispatch({
+        type: 'settle',
+        message: { id, at: now(), role: 'ai', kind: 'uploading', fileName, sizeBytes, progress: 0 },
+      }),
+    [],
+  );
+
+  /* 업로드 예외처리는 범위 밖이다 (04 문서 C4). 다만 올라가던 카드를 그대로 두면
+     영영 도는 것처럼 보여서, 한 줄로 사정을 알리고 다시 올릴 수 있게 둔다.
+     손으로 고른 영상과 예시 영상이 **같은 문구로** 실패하도록 한 곳에 둔다 */
+  const failUpload = useCallback(
+    (id: string) =>
+      dispatch({
+        type: 'settle',
+        message: {
+          id,
+          at: now(),
+          role: 'ai',
+          kind: 'text',
+          text: '영상을 올리지 못했어요. 다시 한 번 올려 주시겠어요?',
+        },
+      }),
+    [],
+  );
+
   /**
    * 업로드 — 진행 카드만 화면이 세운다.
    * 올라가고 나면 **첨부 카드는 서버가 만들어 보내 준다.** 여기서는 세워 둔 카드를 치울 뿐이다.
    * 설명이 이미 있으면 서버가 분석까지 알아서 시작한다 (기능명세 1.4).
+   *
+   * `cardId`를 주면 이미 세워 둔 카드를 이어서 쓴다 — 예시 영상은 파일을 받아 오는 동안
+   * 먼저 카드를 세워 두기 때문이다. 그 뒤로는 손으로 고른 것과 완전히 같은 길이다.
    */
   const startUpload = useCallback(
-    async (file: File) => {
-      const id = put({
-        role: 'ai',
-        kind: 'uploading',
-        fileName: file.name,
-        sizeBytes: file.size,
-        progress: 0,
-      });
+    async (file: File, cardId?: string) => {
+      const id =
+        cardId ??
+        put({
+          role: 'ai',
+          kind: 'uploading',
+          fileName: file.name,
+          sizeBytes: file.size,
+          progress: 0,
+        });
 
       try {
         await service.uploadVideo(caseId, file, (p) => {
@@ -153,43 +186,52 @@ export function CaseWorkspacePage() {
         dispatch({ type: 'drop', id });
         await refresh();
       } catch {
-        /* 업로드 예외처리는 범위 밖이다 (04 문서 C4). 다만 올라가던 카드를 그대로 두면
-           영영 도는 것처럼 보여서, 한 줄로 사정을 알리고 다시 올릴 수 있게 둔다 */
         if (activeCase.current !== caseId) return;
-        dispatch({
-          type: 'settle',
-          message: {
-            id,
-            at: now(),
-            role: 'ai',
-            kind: 'text',
-            text: '영상을 올리지 못했어요. 다시 한 번 올려 주시겠어요?',
-          },
-        });
+        failUpload(id);
       }
     },
-    [caseId, put, refresh],
+    [caseId, failUpload, put, refresh],
   );
 
-  /* 예시 영상 — public/sample/에 있는 파일을 받아 진짜 고른 것처럼 같은 길로 흘린다.
-     여기서 File을 만들어 두면 업로드부터는 손으로 고른 것과 구분되지 않는다.
-     서버가 붙어도 이 길은 그대로다 (실제 업로드가 된다) */
+  /**
+   * 예시 영상 — `public/sample/`에 있는 파일을 받아 손으로 고른 것과 **같은 길로** 흘린다.
+   *
+   * 누른 즉시 업로드 카드를 세운다. 파일을 받아 오는 동안은 진행률이 0에 머무는데,
+   * 손으로 고를 때도 첫 진행 신호가 올 때까지 0이라 보이는 모양이 같다.
+   * 못 받으면 업로드 실패와 같은 문구를 낸다 — 예전에는 아무 일도 없는 것처럼 조용히 끝났다.
+   */
   const pickSample = useCallback(
     async (fileName: string) => {
       if (fetchingSample) return;
       setFetchingSample(true);
+      const id = put({ role: 'ai', kind: 'uploading', fileName, sizeBytes: 0, progress: 0 });
+
+      let file: File;
       try {
         const res = await fetch(sampleVideoUrl(fileName));
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`예시 영상을 받지 못했어요 (${res.status})`);
+        /* 크기는 헤더가 먼저 알려 준다 — 본문을 다 받기 전에 카드에 채워 넣는다 */
+        const total = Number(res.headers.get('content-length'));
+        if (total > 0) showUploading(id, fileName, total);
         const blob = await res.blob();
-        await startUpload(new File([blob], fileName, { type: blob.type || 'video/mp4' }));
+        file = new File([blob], fileName, { type: blob.type || 'video/mp4' });
       } catch {
-        /* 예시 파일이 없거나 못 받은 경우. 화면은 그대로 두고 [영상 올리기]로 가면 된다 */
+        if (activeCase.current === caseId) failUpload(id);
+        return;
       } finally {
+        /* 파일만 받으면 단추는 풀어 준다. 업로드 중 잠금은 손으로 고를 때도 없다 */
         setFetchingSample(false);
       }
+
+      /* 받는 사이에 사건을 떠났으면 남의 대화에 붙이지 않는다 */
+      if (activeCase.current !== caseId) {
+        dispatch({ type: 'drop', id });
+        return;
+      }
+      showUploading(id, fileName, file.size);
+      await startUpload(file, id);
     },
-    [fetchingSample, startUpload],
+    [caseId, failUpload, fetchingSample, put, showUploading, startUpload],
   );
 
   /**
