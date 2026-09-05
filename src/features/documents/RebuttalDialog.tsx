@@ -40,16 +40,30 @@ export function RebuttalDialog({
   const [dropped, setDropped] = useState<string[]>([]);
   const [touched, setTouched] = useState(false);
 
-  /* 초안이 새로 오면 칸을 다시 채운다. effect가 아니라 렌더 중에 맞추는 게 정석이다 */
-  const [seed, setSeed] = useState<Rebuttal | null>(null);
-  if (doc !== seed) {
-    setSeed(doc);
+  /**
+   * 칸을 채우는 것은 **열 때 한 번뿐이다.**
+   *
+   * 전에는 `doc`의 정체가 바뀌면 다시 채웠는데, 그 정체는 대화 카드에서 나온다.
+   * SSE가 끊겼다 붙으면 lost 처리가 대화를 통째로 다시 읽어(reset) 카드가 새 객체가
+   * 되고, 그 순간 적어 넣던 받는이·접수번호·본문이 초안 값으로 덮여 사라졌다.
+   * 한참 치다가 갑자기 화면이 되돌아가는 것처럼 보이던 것이 이것이다.
+   *
+   * 여는 쪽(openRebuttal)이 **전문을 받아 온 뒤에** 열어 주므로,
+   * 열리는 순간의 doc이 이미 최종본이다.
+   */
+  /* 창이 실제로 보이는 조건과 같아야 한다(아래 Dialog의 open). doc이 아직 없을 때
+     씨앗을 박아 두면, 나중에 초안이 SSE로 붙어 창이 떠도 빈 칸으로 남는다 */
+  const visible = open && doc !== null;
+  const [seededOpen, setSeededOpen] = useState(false);
+  if (visible && !seededOpen) {
+    setSeededOpen(true);
     setTo(doc?.to ?? '');
     setBody(doc?.body ?? '');
     setClaimNo(initialClaimNo ?? '');
     setDropped([]);
     setTouched(false);
   }
+  if (!visible && seededOpen) setSeededOpen(false);
 
   /* 서버가 빼 둔 첨부 — 왜 빠졌는지 사정이 함께 온다 (25MB 초과 등) */
   const excluded = doc ? doc.attachments.filter((a) => !a.included && a.note) : [];
@@ -87,27 +101,28 @@ export function RebuttalDialog({
 
   return (
     <Dialog
-      open={open && doc !== null}
+      open={visible}
       onClose={onClose}
       title="반박의견서 보내기"
       width={640}
       footer={
         <div className="flex w-full flex-col gap-3">
+          {/*
+            잠금 이유를 단추에 붙이지 않는다 — Button이 lockedReason을 받으면 제 자신을
+            세로 flex로 감싸서, 글이 나타나는 순간 바닥의 단추 두 개가 밀려 흐트러진다.
+            무엇이 모자란지는 이미 각 칸의 오류 문구가 말해 준다.
+            보낸 문서라는 사정만 자리가 고정된 한 줄로 남긴다.
+          */}
+          {alreadySent && (
+            <p className="text-[12.5px] leading-[1.5] text-muted">
+              보낸 문서는 수정할 수 없어요. 다시 보내려면 새 문서로 만들어요.
+            </p>
+          )}
           <div className="flex flex-wrap justify-end gap-2">
             <Button variant="secondary" onClick={onClose}>
               취소
             </Button>
-            <Button
-              onClick={send}
-              disabled={!canSend}
-              lockedReason={
-                alreadySent
-                  ? '보낸 문서는 수정할 수 없어요. 다시 보내려면 새 문서로 만들어요.'
-                  : !canSend && touched
-                    ? '받는이와 접수번호를 채우면 보내기가 열려요.'
-                    : undefined
-              }
-            >
+            <Button onClick={send} disabled={!canSend}>
               {sending ? '보내는 중…' : '보내기'}
             </Button>
           </div>

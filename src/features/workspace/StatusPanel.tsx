@@ -84,7 +84,14 @@ export function StatusPanel({
   /* 줄 하나가 세 가지 상태를 가진다 — 잠김 / 눌러서 만들기 / 눌러서 열기.
      "보낼 수 있어요"라고 써 놓고 눌리지 않는 줄을 만들지 않는다 */
   const statementRow = statement
-    ? { value: `${versionLabel(statement.version)} · ${statement.pageCount}장`, locked: false }
+    ? {
+        /* 장수는 서버가 센 값이다. 아직 없으면 지어내지 않고 뺀다 (카드·전문과 같은 규칙) */
+        value:
+          statement.pageCount > 0
+            ? `${versionLabel(statement.version)} · ${statement.pageCount}장`
+            : versionLabel(statement.version),
+        locked: false,
+      }
     : item.verdict
       ? { value: '아직 없음 · 눌러서 만들기', locked: false }
       : { value: '잠김 · 판정이 먼저예요', locked: true };

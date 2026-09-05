@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
+import { Dots } from '@/components/ui/Dots';
 import { Icon } from '@/components/ui/Icon';
 import { DISCLAIMER } from '@/config';
 import type { Statement } from '@/domain/document';
@@ -59,7 +60,7 @@ export function StatementDialog({
       onClose={onClose}
       title="사건경위서"
       width={760}
-      bodyClass="px-10 py-8"
+      bodyClass="px-5 py-6 sm:px-10 sm:py-8"
       icon={
         <span className="flex shrink-0 text-muted" aria-hidden>
           <Icon name="file" size={20} />
@@ -86,12 +87,15 @@ export function StatementDialog({
                 aria-label="다시 쓸 때 반영할 요청"
                 className="h-11 min-w-0 flex-1 rounded-md border border-line bg-surface px-4 text-[14px] text-ink placeholder:text-muted focus:outline-none disabled:bg-bg-2 disabled:text-disabled"
               />
-              <Button
-                variant="secondary"
-                onClick={rewrite}
-                disabled={rewriting}
-              >
-                {rewriting ? '다시 쓰는 중…' : '다시 쓰기'}
+              <Button variant="secondary" onClick={rewrite} disabled={rewriting}>
+                {rewriting ? (
+                  <>
+                    다시 쓰는 중
+                    <Dots />
+                  </>
+                ) : (
+                  '다시 쓰기'
+                )}
               </Button>
               <Button onClick={onPrint} disabled={rewriting}>
                 <Icon name="file" size={15} />
@@ -99,7 +103,9 @@ export function StatementDialog({
               </Button>
             </div>
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <span className="tnum text-[12.5px] text-muted">1 / {doc.pageCount}쪽</span>
+              {doc.pageCount > 0 && (
+                <span className="tnum text-[12.5px] text-muted">1 / {doc.pageCount}쪽</span>
+              )}
               <span className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</span>
             </div>
           </div>

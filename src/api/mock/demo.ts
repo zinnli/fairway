@@ -41,24 +41,32 @@ export const DEMO_VIDEO: VideoRef = {
  * 영상 분석 요약 — h18의 사실 표를 대신하는 글 한 덩이 (04 문서 C7).
  * 사고마다 볼 것이 달라 항목으로 못 박지 않는다. 못 본 것도 그대로 적는다.
  */
-export const ANALYSIS_SUMMARY =
-  '영상을 다 봤어요. 내 차는 2차로에서 직진 중이었고, 상대 차량은 우측에서 교차로에 ' +
-  '들어왔어요. 진입할 때 상대 신호는 적색이었고, 내 차 속도는 약 48km/h로 보여요. ' +
-  '충돌 부위와 정지선 통과 시점은 영상 각도 때문에 확인하지 못했어요.';
+export const ANALYSIS_SUMMARY = [
+  /* 서버가 **문장마다 줄을 나눠** 보낸다. 목도 같은 모양이어야 화면이 같아진다
+     (AiText의 whitespace-pre-line이 이 줄바꿈을 살린다) */
+  '영상을 다 봤어요.',
+  '내 차는 2차로에서 직진 중이었고, 상대 차량은 우측에서 교차로에 들어왔어요.',
+  '진입할 때 상대 신호는 적색이었고, 내 차 속도는 약 48km/h로 보여요.',
+  '충돌 부위와 정지선 통과 시점은 영상 각도 때문에 확인하지 못했어요.',
+].join('\n');
 
 /**
  * 판정 전에 글로 되묻는 것 — h20b. 선택 칩 없이 글로 묻고 글로 받는다 (04 문서 C7).
  * 사고마다 물을 것이 달라 목에서는 시연 사례의 두 가지만 안다.
+ *
+ * 순번("1/2")은 **문장 끝에 붙여 보낸다** — 서버도 같은 자리에 넣는다(명세 §4).
+ * 화면이 떼어 내 정보 글자로 돌리므로(AiText) 목과 서버가 똑같이 보인다.
  */
 export const DEMO_QUESTIONS = [
-  '차량 어느 부분에 충돌했는지 기억나세요? "우측 앞펜더"처럼 편하게 적어 주세요.',
-  '신호가 바뀔 때 정지선을 지나고 있었나요? 기억이 안 나면 그렇게 적어 주셔도 괜찮아요.',
+  '차량 어느 부분에 충돌했는지 기억나세요? "우측 앞펜더"처럼 편하게 적어 주세요. 1/2',
+  '신호가 바뀔 때 정지선을 지나고 있었나요? 기억이 안 나면 그렇게 적어 주셔도 괜찮아요. 2/2',
 ];
 
 /** 판정 — 신호위반 일방과실 (h21). 일치도·쟁점·상대 주장은 9/3에 빠졌다 */
 export const DEMO_VERDICT: Verdict = {
   ratio: { mine: 0, opponent: 100 },
   chartName: '신호기 있는 교차로 · 신호위반',
+  chartNote: '사고 유형별 기본 비율을 정해 둔 표 · 차대이륜차 편',
   chartNo: null,
   baseRatio: { mine: 0, opponent: 100 },
   adjustments: [],
@@ -70,6 +78,33 @@ export const DEMO_VERDICT: Verdict = {
   ],
   createdAt: '2026-08-22T09:24:00+09:00',
 };
+
+/**
+ * 심의사례 그림 **자리표시자** — 목에서만 쓴다.
+ *
+ * 진짜 그림은 서버가 서명 붙은 주소로 준다(`imageUrl`). 목에는 그 파일이 없어서
+ * 그림 자리가 통째로 안 그려지고, 그러면 팝업 배치를 눈으로 확인할 수 없다.
+ * 그래서 **실제와 같은 비율(830×420)** 의 SVG를 data URI로 심어 둔다 —
+ * 파일도 네트워크도 필요 없고, 서버에 붙으면 이 값은 쓰이지 않는다.
+ *
+ * 진짜 자료로 오해하지 않도록 그림 안에 목 데이터라고 적어 둔다.
+ */
+const PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="830" height="420" viewBox="0 0 830 420">
+  <rect width="830" height="420" fill="#FAFBFC"/>
+  <rect x="24" y="24" width="782" height="48" fill="#F0F2F5"/>
+  <text x="415" y="54" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#667085">사례 개요</text>
+  <g stroke="#E4E7EC" stroke-width="1">
+    <rect x="24" y="72" width="782" height="56" fill="none"/>
+    <rect x="24" y="128" width="782" height="56" fill="none"/>
+    <rect x="24" y="184" width="782" height="56" fill="none"/>
+    <rect x="24" y="240" width="782" height="56" fill="none"/>
+    <line x1="220" y1="72" x2="220" y2="296"/>
+  </g>
+  <text x="415" y="356" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#98A2B3">그림 자리 · 목 데이터</text>
+  <text x="415" y="384" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#98A2B3">서버에 붙으면 실제 사례 개요 표가 들어옵니다</text>
+</svg>`;
+
+export const DEMO_PRECEDENT_IMAGE = `data:image/svg+xml,${encodeURIComponent(PLACEHOLDER_SVG)}`;
 
 /** 사건경위서 (h30 전문) */
 export const DEMO_STATEMENT: Statement = {
@@ -98,7 +133,9 @@ export const DEMO_STATEMENT: Statement = {
         '요청드립니다.',
     },
   ],
-  pageCount: 2,
+  /* 위 네 절이 11pt·여백 18/16mm에서 한 장에 들어간다.
+     명세 예시가 2로 적혀 있지만 그건 같은 본문에 붙은 자리표시자 값이다 */
+  pageCount: 1,
   updatedAt: '2026-08-25T10:10:00+09:00',
 };
 

@@ -57,7 +57,14 @@ export function ErrorDialog({
   );
 }
 
-/** P-3 발송 확인 — h35. 되돌릴 수 없는 행동이라 한 번 더 묻는다 */
+/**
+ * P-3 발송 확인 — h35. 되돌릴 수 없는 행동이라 한 번 더 묻는다.
+ *
+ * **보내는 동안에는 물러설 수 없다.** 발송은 동기라 1~3초 걸리는데(명세 G-4),
+ * 그 사이에 [다시 볼게요]로 나가면 요청은 이미 날아간 뒤다 —
+ * 성공하면 메일은 나갔는데 취소한 줄 알고, 실패하면 닫은 창이 도로 열린다.
+ * ×·Esc까지 함께 막는다. 하나만 막으면 나머지로 빠져나간다.
+ */
 export function SendConfirmDialog({
   open,
   draft,
@@ -79,10 +86,11 @@ export function SendConfirmDialog({
       onClose={onBack}
       title="이대로 보낼까요?"
       width={480}
+      dismissible={!sending}
       footer={
         <>
           <span className="flex-1" />
-          <Button variant="secondary" onClick={onBack}>
+          <Button variant="secondary" onClick={onBack} disabled={sending}>
             다시 볼게요
           </Button>
           <Button onClick={onSend} disabled={sending}>

@@ -18,7 +18,7 @@ import * as videosApi from './endpoints/videos';
 import * as verdictApi from './endpoints/verdict';
 import * as reportApi from './endpoints/report';
 import * as rebuttalApi from './endpoints/rebuttal';
-import { API_ORIGIN } from './client';
+import { API_ORIGIN, downloadFile } from './client';
 import { setToken } from './tokens';
 import { subscribeCase } from './sse';
 import type { CaseDto, JobDto, SessionDto } from './dto';
@@ -56,6 +56,7 @@ function caseWithRatio(c: CaseDto): Case {
     ratio,
     conclusion: '',
     chartName: '',
+    chartNote: null,
     chartNo: null,
     baseRatio: ratio,
     adjustments: [],
@@ -63,6 +64,24 @@ function caseWithRatio(c: CaseDto): Case {
     createdAt: c.updatedAt,
   };
   return toCase(c, lite);
+}
+
+/**
+ * 받아 온 파일을 저장한다.
+ *
+ * · 문서에 붙이지 않은 <a>는 Firefox에서 click이 먹지 않는다
+ * · 브라우저가 blob을 다 읽기 전에 주소를 거두면 빈 파일이 떨어진다 — 한 박자 뒤에 거둔다
+ */
+function saveAs(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.style.display = 'none';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
 export const httpService: CaseService = {
@@ -173,8 +192,20 @@ export const httpService: CaseService = {
     return verdict ? toVerdict(verdict) : null;
   },
 
-  getPrecedentText: async (caseId, precedent: Precedent) =>
-    (await verdictApi.precedent(precedent.no, caseId)).bodyText,
+  /**
+   * 그림 주소는 서버가 서명을 붙여 준다 — 우리가 조립하지 않는다.
+   * 상대 주소(`/api/v1/…`)로 오므로 원점만 앞에 붙인다. API_BASE가
+   * 개발 프록시 때문에 상대일 수도 있어 API_ORIGIN이 빈 문자열이면 그대로 상대가 된다.
+   * <img>는 헤더를 못 보내므로 Authorization도 credentials도 붙이지 않는다.
+   */
+  getPrecedent: async (caseId, precedent: Precedent) => {
+    const p = await verdictApi.precedent(precedent.no, caseId);
+    return {
+      bodyText: p.bodyText,
+      imageUrl: p.imageUrl ? `${API_ORIGIN}${p.imageUrl}` : null,
+      imageCaption: p.imageUrl ? p.imageCaption : null,
+    };
+  },
 
   /* ── 사건경위서 ───────────────────────────────────────── */
 
@@ -191,18 +222,11 @@ export const httpService: CaseService = {
 
   /**
    * PDF는 서버가 만든다 — html2canvas로 그리지 않는다(한글이 이미지로 뭉개진다).
-   * 인증이 필요해서 링크로 바로 열지 못하고, 받아서 저장한다.
+   * 인증이 필요해서 링크로 바로 열지 못하고, 받아서 저장한다 (F-5로 만들고 F-6으로 받는다).
    */
   downloadStatementPdf: async (caseId, version) => {
     const pdf = await reportApi.createPdf(caseId, version);
-    const res = await fetch(`${API_ORIGIN}${pdf.downloadUrl}`, { credentials: 'include' });
-    const blob = await res.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = pdf.filename;
-    a.click();
-    URL.revokeObjectURL(url);
+    saveAs(await downloadFile(`${API_ORIGIN}${pdf.downloadUrl}`), pdf.filename);
   },
 
   /* ── 반박의견서 ───────────────────────────────────────── */

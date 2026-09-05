@@ -1,13 +1,13 @@
 import type { Case, CaseSummary, VideoRef } from '@/domain/case';
 import type { ChatMessage } from '@/domain/message';
 import type { Rebuttal, Statement } from '@/domain/document';
-import type { Precedent, Verdict } from '@/domain/verdict';
+import type { Precedent, PrecedentDetail, Verdict } from '@/domain/verdict';
 
 /**
  * 서비스 계약 — **화면이 아는 유일한 인터페이스.**
  * 화면은 경로도 DTO도 SSE도 모른다. 도메인 타입만 오간다.
  *
- * 20_API명세서_v2를 받고 다시 그렸다. 예전 Api와 크게 다른 두 가지:
+ * docs/handoff/05_API_명세서.md를 받고 다시 그렸다. 예전 Api와 크게 다른 두 가지:
  *
  * 1. **분석·판정을 부르지 않는다.** 영상을 올리거나 글을 보내면 서버가 알아서 Job을 돌리고,
  *    결과 카드는 subscribe()로 들어온다. analyze()·answerQuestion()·judge()는 사라졌다.
@@ -98,8 +98,8 @@ export interface CaseService {
 
   /* ── 판정 ─────────────────────────────────────────────── */
   getVerdict(caseId: string): Promise<Verdict | null>;
-  /** H37 — 사례마다 내용이 달라 글 한 덩이로 온다 */
-  getPrecedentText(caseId: string, precedent: Precedent): Promise<string>;
+  /** H37 — 사례마다 내용이 달라 글로 온다. 그림이 있으면 함께 온다 */
+  getPrecedent(caseId: string, precedent: Precedent): Promise<PrecedentDetail>;
 
   /* ── 사건경위서 ───────────────────────────────────────── */
   createStatement(caseId: string): Promise<void>;

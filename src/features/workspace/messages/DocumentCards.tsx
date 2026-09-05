@@ -1,3 +1,4 @@
+import { Dots } from '@/components/ui/Dots';
 import { Button } from '@/components/ui/Button';
 import { DISCLAIMER } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
@@ -38,7 +39,9 @@ export function StatementDraftCard({
       <div className="flex flex-wrap items-baseline gap-2">
         <p className="text-[15px] font-semibold text-ink">사건경위서 초안이 준비됐어요</p>
         <p className="text-[12.5px] font-medium text-muted">
-          {versionLabel(doc.version)} · {doc.pageCount}장
+          {versionLabel(doc.version)}
+          {/* 장수는 서버가 만든 PDF를 세어 준 값이다. 못 받으면 지어내지 않고 숨긴다 */}
+          {doc.pageCount > 0 && ` · ${doc.pageCount}장`}
         </p>
       </div>
 
@@ -64,7 +67,14 @@ export function StatementDraftCard({
           전문 보기
         </Button>
         <Button variant="secondary" onClick={onRewrite} disabled={rewriting}>
-          {rewriting ? '다시 쓰는 중…' : '다시 쓰기'}
+          {rewriting ? (
+            <>
+              다시 쓰는 중
+              <Dots />
+            </>
+          ) : (
+            '다시 쓰기'
+          )}
         </Button>
         <Button variant="secondary" onClick={onPrint}>
           PDF 받기

@@ -23,8 +23,9 @@ pnpm lint     # oxlint
    브라우저로 열고 주소 끝에 `#h21`을 붙이면 그 화면으로 바로 간다.
    `h09 h20b h26 h27 h28 h29 h30 h31 h33 h40`에는 HTML 주석으로 핸드오프 노트가 들어 있다.
 2. `docs/handoff/11_DesignSystem.html` — 토큰·부품·상태·반응형 규격
-3. `docs/handoff/02_기능명세서.md` · `03_유저플로우.md` — 동작 규칙
-4. 그 밖의 문서
+3. `docs/handoff/05_API_명세서.md` — 백엔드 계약 정본 (9/4 수령). **커밋 금지** — `.gitignore`가 막아 둔다
+4. `docs/handoff/02_기능명세서.md` · `03_유저플로우.md` — 동작 규칙
+5. 그 밖의 문서
 
 - `docs/handoff/00_프론트_읽어주세요.md` — 디자인팀이 남긴 주의사항. 화면 작업 전 반드시 확인
 - `docs/handoff/01_화면색인.md` — 화면 id ↔ 기능 번호 대응표
@@ -92,12 +93,15 @@ src/
                   mock/  같은 계약의 브라우저 구현. 백엔드가 흔들려도 시연이 굴러가게 남긴다
                   교체 지점은 api/index.ts 한 줄 (VITE_API=http)
                   **분석·판정을 부르지 않는다** — 올리거나 보내면 서버가 돌리고 결과는 subscribe로 온다
-  store/          caseStore(zustand) · chatReducer
-  features/       auth · cases · workspace(messages/ dialogs/) · documents
-  components/ui/  Button Badge RatioBar StepDots StageIcon Dialog ConfirmDialog Drawer Field Icon Disclaimer BrandMark
+  store/          caseStore(zustand) · chatReducer · sessionStore(로그인 상태)
+  pages/          라우트가 가리키는 5장 + DesignSystemPage(개발 전용)
+  features/       auth · cases · onboarding · workspace(messages/ dialogs/) · documents
+  components/ui/  Button Badge RatioBar StepDots StageIcon Dialog ConfirmDialog Drawer Field Icon Disclaimer
+                  BrandMark Dots(기다림 표시 — 분석 중·다시 쓰는 중이 함께 쓴다)
                   (Chip은 9/3에 빠졌다 — 선택 칩·출처 태그가 함께 없어졌다)
+  lib/            cn · format(formatRatio) · document · zodResolver
   styles/theme.css  토큰 정본
-  config.ts       팀 미확정 값 전부 (APP_NAME · REQUIRE_CLAIM_NO · VIDEO_LIMITS · EMAIL_MODE)
+  config.ts       팀 미확정 값 전부 (APP_NAME · REQUIRE_CLAIM_NO · VIDEO_LIMITS · EMAIL_MODE · SAMPLE_VIDEOS)
 ```
 
 `data-sc-name="HiSidebar"`(26화면) / `"HiStatus"`(25화면)가 원본에 표시돼 있다.
@@ -105,10 +109,18 @@ src/
 
 ## 백엔드
 
-**명세는 `20_API명세서_v2`가 정본이다** (9/4 수령). 최악의 경우 프론트 단독으로 시연까지 가야 한다.
+**명세는 `docs/handoff/05_API_명세서.md`가 정본이다** (9/4 수령. 첫 줄에 "커밋 금지"라고 적혀 있고
+`.gitignore`가 막아 둔다 — 저장소에는 없고 각자 로컬에만 둔다). 최악의 경우 프론트 단독으로 시연까지 가야 한다.
+
+**명세와 `04_기획축소_0903.md`가 어긋나면 `04`가 이긴다.** 명세에는 재판정(`rejudge`)·`facts`처럼
+9/3에 뺀 것이 그대로 살아 있다 — 서버가 보내 줘도 화면은 만들지 않는다.
 
 목이 서버와 **같은 계약**(`src/api/service.ts`)을 브라우저 안에서 구현한다 — 화면은 둘을 구분하지 못한다.
 `VITE_API=mock`으로 배포하면 백엔드 없이도 전 구간이 돈다. MSW·Dexie는 쓰지 않는다(목은 메모리라 새로고침하면 시드로 돌아간다).
+
+**`VITE_API`를 안 넣으면 아무 소리 없이 목으로 떨어진다** — 화면이 둘을 구분하지 못하니 겉으로는 멀쩡해 보인다.
+서버에 붙이려면 `VITE_API=http`와 `VITE_API_BASE`(끝에 `/api/v1`, 슬래시로 끝내지 않는다) 둘 다 필요하다.
+값은 **빌드할 때 박히므로** 바꾸면 개발 서버를 다시 띄우고, Vercel에서는 저장한 뒤 재배포해야 한다.
 
 계약이 예전과 다른 두 가지: **분석·판정을 부르지 않는다**(올리거나 보내면 서버가 돌리고 결과는 `subscribe()`로 온다),
 **카드를 화면이 만들지 않는다**(화면이 세우는 건 업로드 중·분석 중 두 장뿐).

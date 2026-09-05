@@ -19,7 +19,7 @@
    화면은 둘을 구분하지 못한다. 사건을 보려면 **반드시 로그인**하고(9/5 확정),
    목은 자격을 보지 않지만 로그인은 거쳐야 한다.
 
-> **9/5 — 이 문서의 6절은 백엔드 명세(`20_API명세서_v2`)를 받고 다시 썼다.**
+> **9/5 — 이 문서의 6절은 백엔드 명세(`docs/handoff/05_API_명세서.md`)를 받고 다시 썼다.**
 > MSW·Dexie는 쓰지 않는다. 계약도 이벤트 구동으로 바뀌었다.
 
 ---
@@ -38,14 +38,14 @@
 | 아이콘 | 디자인 파일의 **인라인 SVG 추출** → 자체 `<Icon>` | 20×20 그리드·1.5px·`currentColor` 규격이 이미 고정. 아이콘 라이브러리를 넣으면 규격이 깨진다 |
 | 폰트 | **Pretendard 로컬 번들** (`woff2` + `@font-face`) | `00` 문서 6절 지시. CDN이 막히면 심사 중에 글꼴이 통째로 바뀐다 |
 | 애니메이션 | **CSS transition만** | 움직임이 "카드 등장 150ms / 아래→위 8px"과 "점 깜빡임" 둘뿐. framer-motion은 과하다 |
-| 테스트 | Vitest 최소 + **Playwright 데모 플로우 1개** | 시연 한 줄기가 끊기지 않는지만 자동으로 확인 (12절) |
+| 테스트 | ~~Vitest + Playwright~~ **미도입 (9/6)** | 계획했지만 시간이 없어 넣지 못했다. 시연 한 줄기는 손으로 확인한다 (12절) |
 | 배포 | **Vercel** | 4절 참고 |
-| 개발 루프 | **Agentation** (MCP 연동) | 3절 참고 |
+| 개발 루프 | ~~Agentation~~ **미도입** | 3절 — 시험해 보고 넣지 않았다. `10_디자인.html`을 직접 대조했다 |
 
 ### 안 넣는 것
 - **framer-motion / GSAP** — 위 참고
 - **아이콘 라이브러리(lucide 등)** — 디자인 SVG가 정본
-- **UI 킷(shadcn/MUI)** — 디자인이 완결돼 있어 오히려 걷어내는 비용이 든다. 단, **Radix Primitives**는 예외로 검토할 값어치가 있다(9절: 팝업 6종의 포커스 트랩)
+- **UI 킷(shadcn/MUI)** — 디자인이 완결돼 있어 오히려 걷어내는 비용이 든다. **Radix Primitives**도 검토했지만 넣지 않았다 — `components/ui/Dialog.tsx`에 포커스 트랩·Esc·스크롤 잠금을 직접 넣었다(9절)
 - **상태관리 대작(Redux Toolkit)** — 스토어 하나로 끝난다
 
 ---
@@ -126,7 +126,9 @@ const styles = {
 
 ---
 
-## 3. Agentation을 쓰는 자리
+## 3. ~~Agentation을 쓰는 자리~~ — 넣지 않았다 (9/6)
+
+> 아래는 8/28 시점의 검토 기록이다. 실제로는 도입하지 않았고, `png/`도 9/4에 지웠다.
 
 [Agentation](https://www.agentation.com/)은 브라우저 오버레이로 요소를 클릭해 코멘트를 달면, **CSS 셀렉터 + 파일 경로 + 컴포넌트 계층**을 묶은 컨텍스트로 만들어 AI 에이전트(Claude Code / Cursor)에 넘겨 주는 도구다. MCP 연동이 되면 복붙 없이 실시간으로 넘어간다. 무료이고 `pnpm add -D agentation`으로 붙인다.
 
@@ -134,7 +136,7 @@ const styles = {
 
 - 잘 맞는 곳: 61화면을 1차로 옮긴 뒤 `png/` 렌더 이미지와 대조하며 "이 여백 4px 더", "이 배지 색이 muted가 아니라 ink-2" 같은 **잔손질을 한 번에 모아 던질 때.** 이 단계가 실제로 가장 오래 걸리는 구간이라 효과가 크다.
 - 안 맞는 곳: 도메인 상태·타입 설계. 여긴 화면을 클릭해서 지시할 수 있는 일이 아니다.
-- 주의: 해커톤 중에 처음 쓰는 도구를 도입하는 위험이 있으니 **D1에 5분만 붙여 보고, 안 되면 미련 없이 버린다.** 대안은 `png/` 이미지를 그냥 에이전트에 첨부하는 것으로 충분하다.
+- 주의: 해커톤 중에 처음 쓰는 도구를 도입하는 위험이 있으니 **D1에 5분만 붙여 보고, 안 되면 미련 없이 버린다.** → **버렸다.**
 
 ---
 
@@ -186,18 +188,19 @@ S5(경위서 전문 h30)·S6(반박의견서 h33·h34)도 라우트가 아니라
 ### 채팅 메시지 = 판별 유니온 (이 프로젝트의 심장)
 
 ```ts
-// src/domain/message.ts  — 9/3 축소 반영 (15종 → 10종)
-export type ChatMessage =
-  | { id: string; role: 'user' | 'ai'; kind: 'text'; text: string }    // 분석 요약·질문·답이 전부 여기로
-  | { id: string; role: 'user';  kind: 'video';     file: VideoRef }
-  | { id: string; role: 'ai';    kind: 'guide' }                       // h12 안내 카드
-  | { id: string; role: 'ai';    kind: 'uploading'; progress: number } // h14 (취소·실패 없음)
-  | { id: string; role: 'ai';    kind: 'analyzing' }                   // h16 (단계 표시 없음)
-  | { id: string; role: 'ai';    kind: 'verdict';   verdict: Verdict } // h21
-  | { id: string; role: 'ai';    kind: 'statementDraft';  doc: Statement }  // h26
-  | { id: string; role: 'ai';    kind: 'rebuttalDraft';   doc: Rebuttal }   // h28
-  | { id: string; role: 'ai';    kind: 'sent';      at: string; to: string } // h29
-  | { id: string; role: 'ai';    kind: 'nextSteps' };                  // f04
+// src/domain/message.ts — 9/3 축소 반영 (15종 → 10종). id·at은 Base가 갖는다
+export type ChatMessage = Base & (
+  | { role: 'user' | 'ai'; kind: 'text'; text: string; cta?: TextCta }  // 분석 요약·질문·답이 전부 여기로
+  | { role: 'user'; kind: 'video'; video: VideoRef }
+  | { role: 'ai'; kind: 'guide' }                                       // h12 안내 카드
+  | { role: 'ai'; kind: 'uploading'; fileName: string; sizeBytes: number; progress: number }  // h14
+  | { role: 'ai'; kind: 'analyzing'; phase?: 'analysis' | 'verdict'; done?: boolean }         // h16
+  | { role: 'ai'; kind: 'verdict'; verdict: Verdict }                   // h21
+  | { role: 'ai'; kind: 'statementDraft'; doc: Statement }              // h26
+  | { role: 'ai'; kind: 'rebuttalDraft'; doc: Rebuttal }                // h28
+  | { role: 'ai'; kind: 'sent'; to: string }                            // h29
+  | { role: 'ai'; kind: 'nextSteps'; steps?: string[] }                 // f04
+);
 ```
 
 **9/3에 빠진 kind** — `choice`(선택 칩) · `facts`(h18) · `question`(칩 질문) · `rejudging`(h24) · `error`(발송 실패는 팝업으로만).
@@ -211,23 +214,32 @@ export type ChatMessage =
 
 ### 폴더 구조
 
+> 아래는 **9/6 기준 실제 구조**다. 계획 당시 잡았던 `app/`·`mocks/`·`domain/fact.ts`는 쓰지 않았다
+> (라우터는 `App.tsx` 하나로 충분했고, 목은 MSW 대신 계약 구현이며, `Fact`는 9/3에 빠졌다).
+
 ```
 src/
-  app/            router.tsx, providers.tsx
-  domain/         타입 정본 — case.ts message.ts fact.ts verdict.ts document.ts
-  store/          caseStore.ts (zustand)  ·  chatReducer.ts
-  api/            index.ts (계약)  ·  mock/  ·  http/     ← 교체 지점 (6절)
+  App.tsx         라우트 5개 + 세션 배선
+  domain/         타입 정본 — case.ts message.ts verdict.ts document.ts
+  store/          caseStore.ts (zustand) · chatReducer.ts · sessionStore.ts
+  api/            service.ts (계약) · index.ts (교체 지점) · mock/ · http/     ← 6절
+  pages/          HomePage LoginPage SignupPage CasesPage CaseWorkspacePage
+                  DesignSystemPage (개발 서버에서만)
   features/
-    auth/         LoginPage SignupPage TermsDialog
-    cases/        CaseListPage CaseCard RenameDialog DeleteDialog
-    workspace/    WorkspaceLayout  Sidebar  StatusPanel  ChatColumn  Composer
-      messages/   GuideCard UploadingCard AnalyzingCard VerdictCard
-                  StatementDraft RebuttalDraft Sent NextSteps ... (10종 · 9/3)
-      dialogs/    PrecedentDialog SendConfirmDialog ErrorDialog VideoDialog
-    documents/    StatementView RebuttalView PdfButton
-  components/ui/  Button Badge RatioBar StepDots StageIcon Drawer Dialog ConfirmDialog Field Icon Disclaimer
-  styles/         theme.css  fonts/
-  mocks/          handlers.ts  scenario.ts  seed.ts
+    auth/         AuthCard AgreementRow TermsDialog PasswordResetDialog
+                  NewPasswordForm RequireSession terms.ts
+    cases/        Sidebar CaseRow
+    onboarding/   OnboardingModal slides mocks
+    workspace/    ChatHeader Composer StatusPanel MobileBar SampleVideoPicker
+      messages/   MessageItem GuideCard AnalyzingCard VerdictCard DocumentCards
+                  AiMessage UserBubble Attachment (kind 10종 · 9/3)
+      dialogs/    GroundDialogs(P-1) AlertDialogs(P-3·P-5) VideoDialog(f01)
+    documents/    StatementDialog(S5) RebuttalDialog(S6)
+  components/ui/  Button Badge RatioBar StepDots StageIcon Drawer Dialog
+                  ConfirmDialog Field Icon Disclaimer BrandMark
+  lib/            cn format(formatRatio) document zodResolver
+  styles/         theme.css
+  config.ts       팀 미확정 값
 ```
 
 ### 현황판·사이드바는 이미 컴포넌트로 표시돼 있다
@@ -240,7 +252,7 @@ src/
 
 ### 화면이 아는 것은 `src/api/service.ts` 하나뿐이다
 
-`20_API명세서_v2`를 받고 계약을 다시 그렸다. 예전 `Api`와 두 군데가 **근본적으로** 다르다.
+`docs/handoff/05_API_명세서.md`를 받고 계약을 다시 그렸다. 예전 `Api`와 두 군데가 **근본적으로** 다르다.
 
 1. **분석·판정을 부르지 않는다.** 영상을 올리거나 글을 보내면 서버가 알아서 Job을 돌리고
    결과는 SSE로만 온다. `analyze()`·`answerQuestion()`·`judge()`가 사라지고 `subscribe()`가 들어왔다.
@@ -364,7 +376,7 @@ export interface Stages { analysis: StageState; verdict: StageState; statement: 
 디자인 파일은 **전부 `<div>`**다. `<button>` `<input>` `<a>`도, `aria-*` `role` `alt`도 없다. 나중에 하려고 미루면 61화면을 두 번 만지게 된다.
 
 - `scp1`/`scp0`/`scp3` 자리 → `<button type="button">`. 사건 목록 행(`scp5`) → `<button>` 안에 제목, `⋯`는 **형제 버튼**(중첩 금지).
-- 팝업 6종(P-1~P-6) → `<dialog>` 또는 Radix `Dialog`. **포커스 트랩·Esc·스크롤 잠금**을 직접 짜면 시간을 잡아먹는다. 여기 하나만 Radix를 쓰는 게 이득이다.
+- 팝업 6종(P-1~P-6) → **포커스 트랩·Esc·스크롤 잠금**이 필요하다. Radix를 쓸까 했지만 결국 `components/ui/Dialog.tsx` 하나에 직접 넣고 전부 그걸 돌려썼다.
 - 진행 띠 → `role="progressbar"` + `aria-valuenow/valuemin/valuemax`. `m05`·`m06`에 이미 `data-step`/`data-steps`/`aria-label`이 들어 있으니 **그 규칙을 나머지에 복사**하면 된다.
 - 분석 중 표시 → `aria-live="polite"`. 채팅에 카드가 붙는 것도 마찬가지. (재판정 배너는 9/3에 빠졌다)
 - 아이콘 버튼 → `aria-label` 필수(이름이 없는 버튼이 된다).
@@ -386,7 +398,7 @@ export interface Stages { analysis: StageState; verdict: StageState; statement: 
 
 ---
 
-## 11. 9일 일정 (8/28 금 ~ 9/6 일, 9/7 배포 고정)
+## 11. 9일 일정 (8/28 금 ~ 9/6 일, **9/6 프로덕션 배포 고정** · 9/7부터 핫픽스만)
 
 | 날짜 | 할 일 | 끝났다는 기준 |
 |---|---|---|
@@ -417,7 +429,7 @@ export interface Stages { analysis: StageState; verdict: StageState; statement: 
 | **접수번호 필수 여부 미확정** (4.1 ★) | 상수 `REQUIRE_CLAIM_NO`로 빼 둔다. 팀 결정이 뒤집혀도 한 줄 |
 | **서비스 이름 미확정** | "카-디펜더"를 `APP_NAME` 상수로. 로고·머리글·메일 제목이 다 여기서 나오게 |
 | **CDN 폰트가 막힌다** | D1에 로컬 번들. 이건 미루면 안 된다 |
-| **Agentation이 안 맞는다** | D1에 5분만 시험. 안 되면 `png/` 첨부로 대체 |
+| ~~**Agentation이 안 맞는다**~~ | **해소** — 안 맞아서 넣지 않았다 (3절) |
 
 ---
 

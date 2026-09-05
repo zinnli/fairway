@@ -1,5 +1,5 @@
 /**
- * 서버가 주고받는 모양 그대로. 20_API명세서_v2.md가 정본이다.
+ * 서버가 주고받는 모양 그대로. docs/handoff/05_API_명세서.md가 정본이다.
  * **도메인 타입을 여기 섞지 않는다** — 변환은 map.ts 한 곳에서만 한다.
  * 이름·대소문자·null 규칙을 명세와 다르게 적지 않는다.
  */
@@ -249,8 +249,12 @@ export interface VerdictReadDto {
 export interface PrecedentDto {
   precedentId: string;
   title: string;
-  /** \n\n 으로 문단을 나눈다 */
+  /** \n\n 으로 문단을 나눈다. 소제목도 문단 하나로 온다 */
   bodyText: string;
+  /** 서명이 붙은 **상대** 주소. 조립하지 않고 그대로 쓴다. 없으면 null */
+  imageUrl: string | null;
+  /** 그림 아래 출처 한 줄. imageUrl이 null이면 같이 null */
+  imageCaption: string | null;
 }
 
 /* ── 사건경위서 ───────────────────────────────────────────────────────── */

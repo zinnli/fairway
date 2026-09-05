@@ -30,10 +30,24 @@ export interface Precedent {
  * 쟁점(disputes)·상대 주장(opponentClaim)은 9/3에 빠졌다.
  * 남는 것은 비율 · 한 줄 결론 · 근거 목록뿐이다.
  */
+/**
+ * 심의사례 팝업(h37)이 받는 것. 그림은 있을 수도 없을 수도 있다.
+ * bodyText는 빈 줄로 나뉜 문단이고, 소제목도 문단 하나로 섞여 온다 —
+ * 화면이 문단 글자를 보고 소제목을 알아본다.
+ */
+export interface PrecedentDetail {
+  bodyText: string;
+  /** 바로 <img src>에 넣을 수 있는 주소. 서명이 붙어 있고 10분간 유효하다 */
+  imageUrl: string | null;
+  imageCaption: string | null;
+}
+
 export interface Verdict {
   ratio: Ratio;
-  /** 인정기준 도표 — 팝업 없이 근거 목록의 글 한 줄로만 쓴다 */
+  /** 인정기준 도표 — 팝업 없이 근거 목록의 줄 하나로만 쓴다 (h38은 9/3 제외) */
   chartName: string;
+  /** 도표가 무엇인지 한 줄 설명. 서버가 준다(basis.chart.note). 없으면 줄을 숨긴다 */
+  chartNote: string | null;
   /** ★ 번호 미확정 (00 문서 5절). null이면 화면에서 번호 칸을 숨긴다 */
   chartNo: string | null;
   baseRatio: Ratio;

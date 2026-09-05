@@ -11,11 +11,13 @@ import { CaseWorkspacePage } from '@/pages/CaseWorkspacePage';
 
 /**
  * 라우트는 5개뿐이다 (docs/frontend-plan.md 5절).
- * /cases/:caseId 하나가 h12~h39 + f01~f04 + m05~m13을 전부 흡수한다.
+ * /cases/:caseId 하나가 h12~h37 + f01·f03·f04 + m05~m13을 전부 흡수한다.
+ * (h39·f02는 9/3 축소로 빠졌다 — docs/handoff/04_기획축소_0903.md)
  * 온보딩은 사건이 0개일 때 뜨는 모달이라 길을 따로 내지 않는다.
  * S5(경위서 전문)·S6(반박의견서)도 라우트가 아니라 모달이다.
  *
- * MSW 대기·전역 ErrorBoundary·인증 가드가 붙는 시점에 Router를 이 파일에서 떼어낸다.
+ * 인증 가드는 RequireSession으로 붙였다. 전역 ErrorBoundary가 붙는 시점에
+ * Router를 이 파일에서 떼어낸다. (MSW는 쓰지 않는다 — 목이 계약을 직접 구현한다)
  */
 
 /** 부품 확인용 화면. 심사 빌드에는 길을 내주지 않는다 */
