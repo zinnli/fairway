@@ -96,7 +96,8 @@ src/
   store/          caseStore(zustand) · chatReducer · sessionStore(로그인 상태)
   pages/          라우트가 가리키는 5장 + DesignSystemPage(개발 전용)
   features/       auth · cases · onboarding · workspace(messages/ dialogs/) · documents
-  components/ui/  Button Badge RatioBar StepDots StageIcon Dialog ConfirmDialog Drawer Field Icon Disclaimer BrandMark
+  components/ui/  Button Badge RatioBar StepDots StageIcon Dialog ConfirmDialog Drawer Field Icon Disclaimer
+                  BrandMark Dots(기다림 표시 — 분석 중·다시 쓰는 중이 함께 쓴다)
                   (Chip은 9/3에 빠졌다 — 선택 칩·출처 태그가 함께 없어졌다)
   lib/            cn · format(formatRatio) · document · zodResolver
   styles/theme.css  토큰 정본

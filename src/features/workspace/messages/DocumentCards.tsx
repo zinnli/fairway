@@ -1,3 +1,4 @@
+import { Dots } from '@/components/ui/Dots';
 import { Button } from '@/components/ui/Button';
 import { DISCLAIMER } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
@@ -66,7 +67,14 @@ export function StatementDraftCard({
           전문 보기
         </Button>
         <Button variant="secondary" onClick={onRewrite} disabled={rewriting}>
-          {rewriting ? '다시 쓰는 중…' : '다시 쓰기'}
+          {rewriting ? (
+            <>
+              다시 쓰는 중
+              <Dots label="다시 쓰는 중" />
+            </>
+          ) : (
+            '다시 쓰기'
+          )}
         </Button>
         <Button variant="secondary" onClick={onPrint}>
           PDF 받기

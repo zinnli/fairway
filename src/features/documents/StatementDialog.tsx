@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
+import { Dots } from '@/components/ui/Dots';
 import { Icon } from '@/components/ui/Icon';
 import { DISCLAIMER } from '@/config';
 import type { Statement } from '@/domain/document';
@@ -86,12 +87,15 @@ export function StatementDialog({
                 aria-label="다시 쓸 때 반영할 요청"
                 className="h-11 min-w-0 flex-1 rounded-md border border-line bg-surface px-4 text-[14px] text-ink placeholder:text-muted focus:outline-none disabled:bg-bg-2 disabled:text-disabled"
               />
-              <Button
-                variant="secondary"
-                onClick={rewrite}
-                disabled={rewriting}
-              >
-                {rewriting ? '다시 쓰는 중…' : '다시 쓰기'}
+              <Button variant="secondary" onClick={rewrite} disabled={rewriting}>
+                {rewriting ? (
+                  <>
+                    다시 쓰는 중
+                    <Dots label="다시 쓰는 중" />
+                  </>
+                ) : (
+                  '다시 쓰기'
+                )}
               </Button>
               <Button onClick={onPrint} disabled={rewriting}>
                 <Icon name="file" size={15} />
