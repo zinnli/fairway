@@ -386,19 +386,21 @@ export const mockService: CaseService = {
       await wait(900);
       if (!find(caseId)) return;
       c.stages = { ...c.stages, rebuttal: '진행중' };
-      push(caseId, { role: 'ai', kind: 'rebuttalDraft', doc: { ...DEMO_REBUTTAL } });
+      /* 갓 만든 초안은 아직 보내지 않았다 — DEMO_REBUTTAL은 발송 뒤 모습이라 sentAt이 차 있다 */
+      push(caseId, { role: 'ai', kind: 'rebuttalDraft', doc: { ...DEMO_REBUTTAL, sentAt: null } });
       setJob(caseId, null);
     })();
   },
 
   getRebuttal: async (caseId) => {
     const found = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
-    return found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL };
+    return found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL, sentAt: null };
   },
 
   updateRebuttal: async (caseId, patch) => {
     const found = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
-    const before = found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL };
+    const before =
+      found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL, sentAt: null };
     const next = { ...before, ...patch };
     if (found && found.kind === 'rebuttalDraft') found.doc = next;
     return next;
@@ -411,6 +413,7 @@ export const mockService: CaseService = {
     const draft = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
     const to = draft && draft.kind === 'rebuttalDraft' ? draft.doc.to : DEMO_REBUTTAL.to;
     const at = now();
+    if (draft && draft.kind === 'rebuttalDraft') draft.doc = { ...draft.doc, sentAt: at };
     c.stages = { ...c.stages, rebuttal: '완료' };
     c.status = '발송 완료';
     push(caseId, { role: 'ai', kind: 'sent', to });
