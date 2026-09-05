@@ -32,7 +32,9 @@ export function Composer({
   return (
     <div className="flex flex-none px-4 pt-3 pb-4 md:px-6">
       <form
-        className="flex h-13 min-w-0 flex-1 items-center gap-2 rounded-full border border-line-2 bg-surface px-2 shadow-[0_4px_12px_rgba(17,20,26,0.06)]"
+        /* 초점은 안쪽 입력칸이 아니라 **알약 전체**에 준다 (00 문서 3-1 입력칸 규칙).
+           테두리 없는 투명 input에 3px 링을 그리면 둥근 알약 안에 네모 링이 뜬다 */
+        className="flex h-13 min-w-0 flex-1 items-center gap-2 rounded-full border border-line-2 bg-surface px-2 shadow-[0_4px_12px_rgba(17,20,26,0.06)] focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--color-brand-tint),0_4px_12px_rgba(17,20,26,0.06)]"
         onSubmit={(e) => {
           e.preventDefault();
           send();
@@ -53,7 +55,9 @@ export function Composer({
           disabled={disabled}
           placeholder={placeholder}
           aria-label="메시지 입력"
-          className="min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-muted focus:outline-none disabled:text-disabled"
+          /* 초점 표시는 감싼 알약이 맡는다 — theme.css의 입력칸 링을 이 칸에서만 끈다 */
+          data-focus="none"
+          className="min-w-0 flex-1 bg-transparent text-[15px] text-ink placeholder:text-muted disabled:text-disabled"
         />
         <button
           type="submit"

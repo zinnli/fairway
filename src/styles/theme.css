@@ -98,6 +98,15 @@
     border-color: var(--color-brand);
     box-shadow: 0 0 0 3px var(--color-brand-tint);
   }
+  /* 감싼 부품이 대신 초점을 받는 칸 — 입력 바 알약 안쪽처럼 제 테두리가 없는 입력칸.
+     투명한 칸에 링을 그리면 둥근 알약 안에 네모 링이 떠서 보기 흉하다.
+     위 두 규칙보다 좁아서 같은 층에서도 이 줄이 이긴다 (:focus까지 함께 막는다) */
+  [data-focus="none"]:focus,
+  [data-focus="none"]:focus-visible {
+    outline: none;
+    box-shadow: none;
+    border-color: transparent;
+  }
 
   /* 00 문서 6절: "움직임 줄이기"면 전부 끈다 */
   @media (prefers-reduced-motion: reduce) {
