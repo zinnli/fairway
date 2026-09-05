@@ -38,6 +38,8 @@ const nextId = () => `m${++seq}`;
 /** 답을 이만큼 기다려도 안 오면 기다림 표시를 걷는다 */
 const REPLY_TIMEOUT_MS = 60_000;
 
+/** 요청 없이 [다시 쓰기]만 눌렀을 때 서버에 보낼 말. 빈 문자열은 422다 (F-4) */
+const REWRITE_ANY = '고칠 곳을 따로 적지 않았어요. 전체를 다시 정리해 주세요.';
 const now = () => new Date().toISOString();
 
 export function CaseWorkspacePage() {
@@ -339,10 +341,20 @@ export function CaseWorkspacePage() {
     await runDocJob('report', () => service.createStatement(caseId));
   }, [caseId, openStatement, runDocJob]);
 
-  /* 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드가 아래에 붙는다 */
+  /**
+   * 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드가 아래에 붙는다.
+   *
+   * **빈 요청은 서버가 받지 않는다** — F-4는 `request`를 1~500자로 받고,
+   * 빈 문자열이면 422(`VALIDATION_FAILED`)로 돌려보낸다. 그런데 요청을 적을 칸이
+   * 있는 곳은 전문 모달(h30)뿐이고, 채팅 카드(h26)의 단추에는 아예 없다.
+   * 그냥 누른 것은 "특별히 고칠 데는 없고 한 번 더 써 달라"는 뜻이므로,
+   * 그 말을 채워서 보낸다. 빈 칸으로 둔 모달도 같은 길을 탄다.
+   */
   const rewriteStatement = useCallback(
     async (instruction?: string) =>
-      runDocJob('report', () => service.reviseStatement(caseId, instruction ?? '')),
+      runDocJob('report', () =>
+        service.reviseStatement(caseId, instruction?.trim() || REWRITE_ANY),
+      ),
     [caseId, runDocJob],
   );
 
