@@ -24,12 +24,17 @@ export function AiMessage({ children, className }: { children: ReactNode; classN
  * 되물음 끝에 붙는 순번("1/2")은 질문이 아니라 진행 표시라서, 본문에서 떼어
  * **정보 글자**로 돌린다 — muted 13.5px · tnum (시안 h20b가 같은 값으로 그려 뒀다).
  * 폭이 고정되는 tnum이라 1/2와 2/2가 같은 자리에 선다.
+ *
+ * `whitespace-pre-line` — 서버가 보내는 글에는 이미 줄바꿈이 들어 있다
+ * (분석 요약의 문장 단위 줄, 심의사례 목록의 항목별 줄). 그대로 <p>에 넣으면
+ * 브라우저가 전부 한 줄로 붙여 버린다. 이 한 줄이 줄바꿈만 살리고
+ * 잇단 공백은 그대로 접어 준다.
  */
 export function AiText({ children }: { children: ReactNode }) {
   const body = typeof children === 'string' ? splitQuestionCount(children) : null;
 
   return (
-    <p className="text-[15px] leading-[1.6] text-ink">
+    <p className="text-[15px] leading-[1.6] whitespace-pre-line text-ink">
       {body ? body.body : children}
       {body?.count && (
         <span className="tnum ml-1 text-[13.5px] font-normal text-muted">{body.count}</span>
