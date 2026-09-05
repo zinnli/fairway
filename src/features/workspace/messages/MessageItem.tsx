@@ -142,7 +142,7 @@ export function MessageItem({
       return <RebuttalDraftCard doc={message.doc} onOpen={actions.onOpenRebuttal} />;
 
     case 'sent':
-      return <SentCard at={message.at} to={message.to} />;
+      return <SentCard at={message.at} to={message.to} attachmentCount={message.attachmentCount} />;
 
     case 'nextSteps':
       return <NextStepsCard steps={message.steps} onOpenProcess={actions.onOpenProcess} />;

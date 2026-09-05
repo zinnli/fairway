@@ -453,12 +453,15 @@ export const mockService: CaseService = {
     if (!c) return;
     await wait(1200);
     const draft = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
-    const to = draft && draft.kind === 'rebuttalDraft' ? draft.doc.to : DEMO_REBUTTAL.to;
+    const doc = draft && draft.kind === 'rebuttalDraft' ? draft.doc : DEMO_REBUTTAL;
+    const to = doc.to;
+    /* 서버는 실제로 붙인 파일을 센다 — 목도 [보내기]에서 켜 둔 것만 센다 (명세 §4.10) */
+    const attachmentCount = doc.attachments.filter((a) => a.included).length;
     const at = now();
     if (draft && draft.kind === 'rebuttalDraft') draft.doc = { ...draft.doc, sentAt: at };
     c.stages = { ...c.stages, rebuttal: '완료' };
     c.status = '발송 완료';
-    push(caseId, { role: 'ai', kind: 'sent', to });
+    push(caseId, { role: 'ai', kind: 'sent', to, attachmentCount });
     push(caseId, { role: 'ai', kind: 'nextSteps' });
     emit(caseId, (on) => on.rebuttalSent?.(at, to));
     touch(caseId);

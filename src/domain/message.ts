@@ -44,7 +44,9 @@ export type ChatMessage = Base &
     | { role: 'ai'; kind: 'verdict'; verdict: Verdict }
     | { role: 'ai'; kind: 'statementDraft'; doc: Statement }
     | { role: 'ai'; kind: 'rebuttalDraft'; doc: Rebuttal }
-    | { role: 'ai'; kind: 'sent'; to: string }
+    /* 첨부 개수는 서버가 센 값이다 (명세 §4.10 attachmentCount).
+       25MB를 넘겨 영상이 빠지면 여기 숫자가 줄어든다 — 0도 그대로 보여 준다 */
+    | { role: 'ai'; kind: 'sent'; to: string; attachmentCount: number }
     /* steps는 서버가 준다. 없으면 화면이 아는 기본 문구를 쓴다 */
     | { role: 'ai'; kind: 'nextSteps'; steps?: string[] }
   );

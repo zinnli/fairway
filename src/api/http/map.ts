@@ -256,7 +256,7 @@ export function toMessage(m: MessageDto): ChatMessage | null {
     }
     case 'sent': {
       const p = m.payload as SentPayloadDto;
-      return { ...base, role: 'ai', kind: 'sent', to: p.recipient };
+      return { ...base, role: 'ai', kind: 'sent', to: p.recipient, attachmentCount: p.attachmentCount };
     }
     /* 로컬 전용 카드는 서버가 보내지 않는다 */
     case 'upload_progress':

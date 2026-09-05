@@ -114,12 +114,22 @@ export function RebuttalDraftCard({ doc, onOpen }: { doc: Rebuttal; onOpen: () =
 }
 
 /** 발송 완료 — h29 */
-export function SentCard({ at, to }: { at: string; to: string }) {
+export function SentCard({
+  at,
+  to,
+  attachmentCount,
+}: {
+  at: string;
+  to: string;
+  /** 서버가 실제로 붙인 파일 수. 0도 그대로 보여 준다 — 빠진 것을 알아야 한다 */
+  attachmentCount: number;
+}) {
   return (
     <AiMessage className="gap-2">
       <p className="text-[15px] font-semibold text-ink">반박의견서를 보냈어요</p>
+      {/* 시안 h29 — "08-25 14:32 · kim@insu.co.kr · 첨부 2개" */}
       <AiText>
-        {timeLabel(at)} · {to}
+        {timeLabel(at)} · {to} · 첨부 {attachmentCount}개
       </AiText>
       <AiNote>보낸 문서는 그대로 보관되고 수정할 수 없어요. 다시 보내려면 새 문서로 만들어요.</AiNote>
     </AiMessage>
