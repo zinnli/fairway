@@ -75,6 +75,33 @@ export const DEMO_VERDICT: Verdict = {
   createdAt: '2026-08-22T09:24:00+09:00',
 };
 
+/**
+ * 심의사례 그림 **자리표시자** — 목에서만 쓴다.
+ *
+ * 진짜 그림은 서버가 서명 붙은 주소로 준다(`imageUrl`). 목에는 그 파일이 없어서
+ * 그림 자리가 통째로 안 그려지고, 그러면 팝업 배치를 눈으로 확인할 수 없다.
+ * 그래서 **실제와 같은 비율(830×420)** 의 SVG를 data URI로 심어 둔다 —
+ * 파일도 네트워크도 필요 없고, 서버에 붙으면 이 값은 쓰이지 않는다.
+ *
+ * 진짜 자료로 오해하지 않도록 그림 안에 목 데이터라고 적어 둔다.
+ */
+const PLACEHOLDER_SVG = `<svg xmlns="http://www.w3.org/2000/svg" width="830" height="420" viewBox="0 0 830 420">
+  <rect width="830" height="420" fill="#FAFBFC"/>
+  <rect x="24" y="24" width="782" height="48" fill="#F0F2F5"/>
+  <text x="415" y="54" text-anchor="middle" font-family="sans-serif" font-size="20" fill="#667085">사례 개요</text>
+  <g stroke="#E4E7EC" stroke-width="1">
+    <rect x="24" y="72" width="782" height="56" fill="none"/>
+    <rect x="24" y="128" width="782" height="56" fill="none"/>
+    <rect x="24" y="184" width="782" height="56" fill="none"/>
+    <rect x="24" y="240" width="782" height="56" fill="none"/>
+    <line x1="220" y1="72" x2="220" y2="296"/>
+  </g>
+  <text x="415" y="356" text-anchor="middle" font-family="sans-serif" font-size="17" fill="#98A2B3">그림 자리 · 목 데이터</text>
+  <text x="415" y="384" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#98A2B3">서버에 붙으면 실제 사례 개요 표가 들어옵니다</text>
+</svg>`;
+
+export const DEMO_PRECEDENT_IMAGE = `data:image/svg+xml,${encodeURIComponent(PLACEHOLDER_SVG)}`;
+
 /** 사건경위서 (h30 전문) */
 export const DEMO_STATEMENT: Statement = {
   version: 1,

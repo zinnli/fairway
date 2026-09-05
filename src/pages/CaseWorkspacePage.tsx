@@ -10,7 +10,7 @@ import { VideoDialog } from '@/features/workspace/dialogs/VideoDialog';
 import { sampleVideoUrl, VIDEO_LIMITS } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { ChatMessage, MessageBody } from '@/domain/message';
-import type { Precedent } from '@/domain/verdict';
+import type { Precedent, PrecedentDetail } from '@/domain/verdict';
 import type { Case, VideoRef } from '@/domain/case';
 import { Sidebar } from '@/features/cases/Sidebar';
 import { ChatHeader } from '@/features/workspace/ChatHeader';
@@ -82,16 +82,19 @@ export function CaseWorkspacePage() {
   const openPopup = popup?.key === viewKey ? popup.which : null;
   const show = (which: 'cases' | 'status' | 'statement' | 'rebuttal') =>
     setDrawer({ key: viewKey, which });
-  /** 사례 설명문. 열 때 받아 온다 — 오기 전에는 아는 것만 보여 준다 */
-  const [precedentText, setPrecedentText] = useState<string | null>(null);
+  /**
+   * 사례 알맹이(글·그림). 열 때 받아 온다 — 오기 전에는 아는 것만 보여 준다.
+   * 그림 주소의 서명은 10분짜리라 **열 때마다 새로 받는 지금 방식이 곧 갱신**이다.
+   */
+  const [precedentDoc, setPrecedentDoc] = useState<PrecedentDetail | null>(null);
   const pop = (which: 'precedent' | 'process', precedent?: Precedent) => {
     setPopup({ key: viewKey, which, precedent });
     if (which === 'precedent' && precedent) {
-      setPrecedentText(null);
+      setPrecedentDoc(null);
       void service
-        .getPrecedentText(caseId, precedent)
-        .then(setPrecedentText)
-        .catch(() => setPrecedentText(null));
+        .getPrecedent(caseId, precedent)
+        .then(setPrecedentDoc)
+        .catch(() => setPrecedentDoc(null));
     }
   };
   const fileRef = useRef<HTMLInputElement>(null);
@@ -792,7 +795,9 @@ export function CaseWorkspacePage() {
       <PrecedentDialog
         open={openPopup === 'precedent'}
         precedent={popup?.precedent ?? null}
-        bodyText={precedentText}
+        bodyText={precedentDoc?.bodyText ?? null}
+        imageUrl={precedentDoc?.imageUrl ?? null}
+        imageCaption={precedentDoc?.imageCaption ?? null}
         onClose={() => setPopup(null)}
       />
       <ProcessDialog open={openPopup === 'process'} onClose={() => setPopup(null)} />

@@ -249,8 +249,12 @@ export interface VerdictReadDto {
 export interface PrecedentDto {
   precedentId: string;
   title: string;
-  /** \n\n 으로 문단을 나눈다 */
+  /** \n\n 으로 문단을 나눈다. 소제목도 문단 하나로 온다 */
   bodyText: string;
+  /** 서명이 붙은 **상대** 주소. 조립하지 않고 그대로 쓴다. 없으면 null */
+  imageUrl: string | null;
+  /** 그림 아래 출처 한 줄. imageUrl이 null이면 같이 null */
+  imageCaption: string | null;
 }
 
 /* ── 사건경위서 ───────────────────────────────────────────────────────── */

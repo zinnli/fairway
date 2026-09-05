@@ -192,8 +192,20 @@ export const httpService: CaseService = {
     return verdict ? toVerdict(verdict) : null;
   },
 
-  getPrecedentText: async (caseId, precedent: Precedent) =>
-    (await verdictApi.precedent(precedent.no, caseId)).bodyText,
+  /**
+   * 그림 주소는 서버가 서명을 붙여 준다 — 우리가 조립하지 않는다.
+   * 상대 주소(`/api/v1/…`)로 오므로 원점만 앞에 붙인다. API_BASE가
+   * 개발 프록시 때문에 상대일 수도 있어 API_ORIGIN이 빈 문자열이면 그대로 상대가 된다.
+   * <img>는 헤더를 못 보내므로 Authorization도 credentials도 붙이지 않는다.
+   */
+  getPrecedent: async (caseId, precedent: Precedent) => {
+    const p = await verdictApi.precedent(precedent.no, caseId);
+    return {
+      bodyText: p.bodyText,
+      imageUrl: p.imageUrl ? `${API_ORIGIN}${p.imageUrl}` : null,
+      imageCaption: p.imageUrl ? p.imageCaption : null,
+    };
+  },
 
   /* ── 사건경위서 ───────────────────────────────────────── */
 

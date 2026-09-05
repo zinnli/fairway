@@ -6,6 +6,7 @@ import type { ActiveJob, CaseDetail, CaseEvents, CaseService, Session } from '..
 import {
   ANALYSIS_SUMMARY,
   DEMO_CASES,
+  DEMO_PRECEDENT_IMAGE,
   DEMO_QUESTIONS,
   DEMO_REBUTTAL,
   DEMO_STATEMENT,
@@ -347,10 +348,40 @@ export const mockService: CaseService = {
 
   getVerdict: async (caseId) => find(caseId)?.verdict ?? null,
 
-  getPrecedentText: async (_caseId, precedent) =>
-    `${precedent.summary} 사례예요.\n\n` +
-    '보험사는 직진차 30 : 이륜차 70을 주장했지만, 블랙박스로 상대 신호위반이 입증되어 ' +
-    '직진차 0 : 이륜차 100으로 뒤집혔어요. 내 사건과 신호 상태·진입 방향·충돌 형태가 같아요.',
+  /* 서버와 같은 소제목 구조로 준다 — 목과 서버가 같은 화면으로 그려진다.
+     목에는 그림 파일이 없으므로 imageUrl은 null이다 (화면은 figure 자체를 안 그린다) */
+  getPrecedent: async (_caseId, precedent) => ({
+    bodyText: [
+      '사고 유형',
+      `차대이륜차 직진 대 직진 사고 · 신호기 있는 사거리 교차로 (${precedent.summary})`,
+      '사고 내용',
+      '청구차량이 녹색신호에 교차로를 직진 통과하던 중, 좌측 도로에서 적색신호에 진입한 ' +
+        '피청구 이륜차와 충돌한 사고임.',
+      '쟁점',
+      '피청구차량이 적색신호에 교차로에 진입하였는지 여부',
+      '청구차량에게 전방주시의무 위반이 있었는지 여부',
+      '과실비율',
+      '기본 30:70 → 결정 0:100 (A 청구차량 : B 피청구차량)',
+      '심의 이유',
+      '블랙박스 영상에 의하여 피청구차량의 신호위반이 명백히 확인되는 점, 청구차량이 이를 ' +
+        '미리 알아차리거나 피할 수 없었던 점을 고려하여 결정함.',
+      '참고 인정기준',
+      '도표 213(나)',
+      '내 사건과 비슷한 점',
+      '사고 장소 유형: 신호기 있는 사거리 교차로',
+      '신호 조건: 상대 차량 적색신호 진입',
+      '충돌 형태: 직진 중 측면 충돌',
+      '내 사건과 다른 점',
+      '상대 차량 종류: 사례는 이륜차, 본 사건은 확인 필요',
+      '판정에서의 역할',
+      '가장 비슷한 사례예요. 이 사례의 결정비율 0:100을 기준값으로 삼아 내 사건의 예상 ' +
+        '과실비율을 계산했어요.',
+    ].join('\n\n'),
+    /* 목에는 진짜 그림이 없다. 배치를 볼 수 있게 같은 비율의 자리표시자를 준다 —
+       서버에 붙으면 서버가 준 서명 주소가 대신 들어온다 */
+    imageUrl: DEMO_PRECEDENT_IMAGE,
+    imageCaption: '출처: 손해보험협회 자동차사고 과실비율 인정기준 · 과실비율 심의사례',
+  }),
 
   createStatement: async (caseId) => {
     const c = find(caseId);
