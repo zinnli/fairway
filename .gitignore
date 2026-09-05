@@ -30,7 +30,6 @@ _to_delete
 # Env
 .env
 .env.*
-!.env.example
 
 # 백엔드가 준 API 명세 — 파일 첫 줄에 "커밋 금지"라고 적혀 있다
 # 파일명이 한글이라 macOS(NFD)와 규칙(NFC)이 어긋난다. ASCII 접두사로 잡는다

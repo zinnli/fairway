@@ -8,7 +8,8 @@
 
 ```bash
 pnpm install     # 처음 한 번
-pnpm dev         # http://localhost:5173 — 지금은 디자인시스템 확인 페이지가 뜬다
+pnpm dev         # http://localhost:5173 — 첫 화면(S0)이 뜬다
+                 # 부품 확인 페이지는 /design-system (개발 서버에서만 열린다)
 pnpm build       # tsc -b && vite build
 pnpm lint        # oxlint
 pnpm fonts:sync  # Pretendard를 node_modules에서 public/으로 다시 복사할 때만
@@ -34,7 +35,7 @@ corepack이 켜져 있으면 자동으로 맞는 버전이 쓰인다.
 
 디자인팀이 갱신본을 주면 `docs/handoff/`를 통째로 덮어쓴다. 사본을 따로 두지 않는다.
 
-## 지금까지 된 것 (D1)
+## 지금까지 된 것
 
 - Vite 8 + React 19 + TS + Tailwind 4
 - **디자인 토큰** `src/styles/theme.css` — 색·반경·간격·초점·스크롤 정본. 값은 여기 말고 어디에도 적지 않는다
@@ -47,7 +48,20 @@ corepack이 켜져 있으면 자동으로 맞는 버전이 쓰인다.
 
 ## 백엔드 연동
 
-`.env`에 `VITE_API_BASE`(끝에 `/api/v1`까지)와 `VITE_API=http`를 넣으면 서버로 붙는다. `.env.example` 참고.
+`.env.local`에 두 줄을 넣으면 서버로 붙는다.
+
+```bash
+VITE_API=http
+VITE_API_BASE=https://<api 주소>/api/v1     # 끝에 /api/v1 까지, 슬래시로 끝내지 않는다
+```
+
+> **`VITE_API`를 안 넣으면 아무 소리 없이 목으로 돈다** (`src/api/index.ts`).
+> 화면은 목과 서버를 구분하지 못하므로 겉으로는 멀쩡해 보인다. 서버에 붙었는지 확인하는 법:
+> 아무 이메일에 8자 비밀번호로 로그인이 되면 아직 목, `AUTH_INVALID_CREDENTIALS`가 뜨면 서버다.
+>
+> **환경변수는 빌드할 때 코드에 박힌다.** 값을 바꾸면 개발 서버를 다시 띄우고,
+> Vercel에서는 변수를 저장한 뒤 **반드시 재배포**해야 한다 — 저장만으로는 이미 만들어진 번들이 그대로다.
+> 재배포됐는지는 `dist/assets/index-*.js` **파일 이름이 바뀌었는지**로 확인한다.
 
 - 전송은 `src/api/http/` — 401이면 refresh 한 번 뒤 재시도, 업로드는 진행률 때문에 XHR, 결과 카드는 SSE로 받는다
 - 목은 같은 계약을 브라우저 안에서 구현한다. **메모리라 새로고침하면 시드로 돌아간다**
