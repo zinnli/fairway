@@ -62,9 +62,11 @@ export const DEMO_QUESTIONS = [
   '신호가 바뀔 때 정지선을 지나고 있었나요? 기억이 안 나면 그렇게 적어 주셔도 괜찮아요. 2/2',
 ];
 
-/** 판정 — 신호위반 일방과실 (h21). 일치도·쟁점·상대 주장은 9/3에 빠졌다 */
+/** 판정 — 신호위반 일방과실 (h21). 일치도·쟁점은 9/3에 빠졌다 */
 export const DEMO_VERDICT: Verdict = {
   ratio: { mine: 0, opponent: 100 },
+  /* 시안 h23이 그려 둔 값. null로 두면 비교 막대가 사라지는 쪽을 볼 수 있다 */
+  opponentClaim: { mine: 30, opponent: 70 },
   chartName: '신호기 있는 교차로 · 신호위반',
   chartNote: '사고 유형별 기본 비율을 정해 둔 표 · 차대이륜차 편',
   chartNo: null,

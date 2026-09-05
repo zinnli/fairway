@@ -27,10 +27,6 @@ export interface Precedent {
 }
 
 /**
- * 쟁점(disputes)·상대 주장(opponentClaim)은 9/3에 빠졌다.
- * 남는 것은 비율 · 한 줄 결론 · 근거 목록뿐이다.
- */
-/**
  * 심의사례 팝업(h37)이 받는 것. 그림은 있을 수도 없을 수도 있다.
  * bodyText는 빈 줄로 나뉜 문단이고, 소제목도 문단 하나로 섞여 온다 —
  * 화면이 문단 글자를 보고 소제목을 알아본다.
@@ -42,8 +38,17 @@ export interface PrecedentDetail {
   imageCaption: string | null;
 }
 
+/**
+ * 쟁점(disputes)은 9/3에 빠졌다. 남는 것은 비율 · 한 줄 결론 · 비교 막대 · 근거 목록이다.
+ */
 export interface Verdict {
   ratio: Ratio;
+  /**
+   * 상대 보험사가 주장하는 비율. 사용자가 대화에서 말해 준 것을 Agent가 뽑아낸다.
+   * **없으면 null이고, 그때는 비교 막대를 그리지 않는다** (명세 §4.6).
+   * 차이 %p 안내 줄은 9/3에 빠진 채로 둔다 (04 문서 C5) — 막대 둘만 나란히 둔다.
+   */
+  opponentClaim: Ratio | null;
   /** 인정기준 도표 — 팝업 없이 근거 목록의 줄 하나로만 쓴다 (h38은 9/3 제외) */
   chartName: string;
   /** 도표가 무엇인지 한 줄 설명. 서버가 준다(basis.chart.note). 없으면 줄을 숨긴다 */

@@ -1,15 +1,16 @@
 import { Dots } from '@/components/ui/Dots';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { DISCLAIMER } from '@/config';
+import { RatioBar } from '@/components/ui/RatioBar';
+import { APP_NAME, DISCLAIMER } from '@/config';
 import { formatRatio, type Precedent, type Verdict } from '@/domain/verdict';
 
 /**
  * 판정 — h21. 61화면의 기준 화면이다.
  * 9/3 축소로 파란 강조 박스가 전부 빠졌다 (04 문서 C5):
- * "근거 N건 · 쟁점 N건" 알약 · 일치도(%) · 상대 주장 비교 · 차이 %p 안내 · 쟁점 줄.
+ * "근거 N건 · 쟁점 N건" 알약 · 일치도(%) · 차이 %p 안내 · 쟁점 줄.
  *
- * 남는 것은 비율 · 한 줄 결론 · 근거 목록뿐이다.
+ * 남는 것은 비율 · 한 줄 결론 · 비교 막대 · 근거 목록이다.
  * 도표 번호는 미확정이라 chartNo가 null이면 번호 칸을 아예 숨긴다.
  */
 export function VerdictCard({
@@ -53,6 +54,24 @@ export function VerdictCard({
       </p>
 
       <p className="text-[15px] leading-[1.6] text-ink">{verdict.conclusion}</p>
+
+      {/*
+        비율 막대 — 시안 h23. 상대 보험사가 주장하는 비율을 사용자가 대화에서
+        말해 줬을 때만 위 칸이 선다(`opponentClaim`이 null이면 서버가 모른다는 뜻).
+        비교할 것이 없으면 우리 판정 막대 하나만 남는다.
+
+        연보라(brand-line) 8px = 상대 주장 · 진보라(brand) 10px = 우리 판정.
+        높이 8/10은 간격이 아니라 부품 규격이라 4배수 예외다.
+
+        시안에 있는 "상대 보험사 주장보다 내 과실이 30%p 낮게 나왔어요" 줄은
+        붙이지 않는다 — 차이 %p 안내는 9/3에 뺀 것이다 (04 문서 C5).
+      */}
+      <div className="flex flex-col gap-3">
+        {verdict.opponentClaim && (
+          <RatioBar label="상대 보험사 주장" ratio={verdict.opponentClaim} />
+        )}
+        <RatioBar label={`${APP_NAME} 판정`} ratio={ratio} emphasis />
+      </div>
 
       <div className="h-px bg-line" />
 

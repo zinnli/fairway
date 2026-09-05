@@ -120,6 +120,7 @@ export function toVerdict(v: VerdictPayloadDto): Verdict {
   const ratio = toRatio(v.ratio);
   return {
     ratio,
+    opponentClaim: v.opponentClaim ? toRatio(v.opponentClaim) : null,
     conclusion: v.summary,
     chartName: v.basis.chart.name,
     chartNote: v.basis.chart.note || null,
