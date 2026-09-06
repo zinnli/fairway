@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { isApiError, service, type ActiveJob, type ApiErrorAction } from '@/api';
+import { Dots } from '@/components/ui/Dots';
 import { Drawer } from '@/components/ui/Drawer';
 import { PrintableStatement, StatementDialog } from '@/features/documents/StatementDialog';
 import { RebuttalDialog } from '@/features/documents/RebuttalDialog';
@@ -110,6 +111,19 @@ export function CaseWorkspacePage() {
   };
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  /* 대화는 한 쪽씩 읽는다 (명세 C-1). 위로 올리면 더 오래된 쪽을 이어 붙인다 */
+  const chatRef = useRef<HTMLDivElement>(null);
+  /** 다음에 읽을 자리. null이면 더 위가 없다 */
+  const olderCursor = useRef<string | null>(null);
+  /** 읽는 중인지. 스크롤은 초당 몇 번씩 불려서 state로는 늦는다 */
+  const readingOlder = useRef(false);
+  const [olderBusy, setOlderBusy] = useState(false);
+  /** 앞에 붙이기 직전의 높이 — 붙인 뒤 그만큼 내려 보던 자리를 지킨다 */
+  const keepAnchor = useRef<number | null>(null);
+  /* 붙였다는 사실 자체를 상태로 남긴다. 겹치기만 해서 대화가 그대로면 리듀서가
+     같은 값을 돌려주는데, 그러면 자리 지키기 효과가 돌지 않아 적어 둔 높이가
+     남고 그 뒤로 새 카드가 와도 화면이 안 내려간다 */
+  const [prependTick, setPrependTick] = useState(0);
   const pickVideo = () => fileRef.current?.click();
 
   const reloadList = useCaseStore((s) => s.load);
@@ -473,17 +487,22 @@ export function CaseWorkspacePage() {
     /* 이전 사건의 대화를 즉시 내린다 — 새 대화가 올 때까지 남겨 두면 남의 카드가
        그대로 보이고, 카드 단추는 이미 이 사건 id에 묶여 있어 엉뚱한 사건에 요청이 나간다 */
     dispatch({ type: 'reset', messages: [] });
+    olderCursor.current = null;
+    keepAnchor.current = null;
 
     Promise.all([service.getCase(caseId), service.listMessages(caseId)])
       .then(([{ item: c, activeJob: job }, past]) => {
         if (!alive) return;
         setLoaded({ id: caseId, item: c });
         setActiveJob(job);
+        olderCursor.current = past.nextCursor;
         /* 지난 대화를 그대로 되살린다. 아직 아무 말도 오가지 않은 사건은
            접수 안내 한 장으로 시작한다 (h12) */
         dispatch({
           type: 'reset',
-          messages: past.length ? past : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
+          messages: past.items.length
+            ? past.items
+            : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
         });
 
         stop = service.subscribe(caseId, {
@@ -524,8 +543,9 @@ export function CaseWorkspacePage() {
             service
               .listMessages(caseId)
               .then((again) => {
-                if (activeCase.current !== caseId || !again.length) return;
-                dispatch({ type: 'reset', messages: again });
+                if (activeCase.current !== caseId || !again.items.length) return;
+                olderCursor.current = again.nextCursor;
+                dispatch({ type: 'reset', messages: again.items });
                 /* reset이 로컬 로딩 카드를 지웠다 — Job이 아직 돌면 같은 id로 도로 세운다 */
                 if (loadingCardId.current !== null && loadingPhase.current !== null) {
                   dispatch({
@@ -555,8 +575,9 @@ export function CaseWorkspacePage() {
             service
               .listMessages(caseId)
               .then((again) => {
-                if (activeCase.current === caseId && again.length) {
-                  dispatch({ type: 'reset', messages: again });
+                if (activeCase.current === caseId && again.items.length) {
+                  olderCursor.current = again.nextCursor;
+                  dispatch({ type: 'reset', messages: again.items });
                 }
               })
               .catch(() => {});
@@ -692,8 +713,58 @@ export function CaseWorkspacePage() {
      아래로 옮김)는 개수를 안 바꿔서, 개수만 보면 옮겨 놓고 화면이 안 내려간다 */
   const lastMessageId = chat.messages.at(-1)?.id ?? null;
   useEffect(() => {
+    /* 위로 올려서 지난 대화를 읽어 온 참이면 내려가지 않는다 — 보던 자리를 뺏는다 */
+    if (keepAnchor.current !== null) return;
     bottomRef.current?.scrollIntoView({ block: 'end' });
   }, [lastMessageId]);
+
+  /**
+   * 지난 대화를 한 쪽 더 읽어 온다 (명세 C-1 · 시안 h26 "위로 올려서 보기").
+   * 건수는 세지 않는다 — 04 문서 C9로 빠졌고 서버도 총 건수를 주지 않는다.
+   */
+  const readOlder = useCallback(() => {
+    const el = chatRef.current;
+    if (!el || olderCursor.current === null || readingOlder.current) return;
+    readingOlder.current = true;
+    setOlderBusy(true);
+    const want = caseId;
+
+    const step = async (): Promise<void> => {
+      const cursor = olderCursor.current;
+      if (cursor === null) return;
+      const page = await service.listMessages(caseId, cursor);
+      if (activeCase.current !== want) return;
+      olderCursor.current = page.nextCursor;
+      /* 화면이 아는 카드가 한 장도 없는 쪽이면(전부 모르는 종류) 다음 쪽으로 넘어간다.
+         여기서 멈추면 대화가 그려지지 않은 채로 더 읽을 길이 끊긴다 */
+      if (!page.items.length) return step();
+      /* 앞에 카드가 붙으면 그만큼 아래로 밀린다. 붙이기 직전 높이를 적어 두고
+         그린 뒤에 차이만큼 내려서 보던 자리를 그대로 둔다 */
+      keepAnchor.current = el.scrollHeight;
+      dispatch({ type: 'prepend', messages: page.items });
+      setPrependTick((n) => n + 1);
+    };
+
+    step()
+      /* 못 읽어도 조용히 둔다 — 지난 대화는 아래 대화를 막지 않는다 */
+      .catch(() => {})
+      .finally(() => {
+        readingOlder.current = false;
+        setOlderBusy(false);
+      });
+  }, [caseId]);
+
+  useLayoutEffect(() => {
+    const el = chatRef.current;
+    if (!el) return;
+    if (keepAnchor.current !== null) {
+      el.scrollTop += el.scrollHeight - keepAnchor.current;
+      keepAnchor.current = null;
+      return;
+    }
+    /* 읽어 온 쪽이 화면을 다 못 채우면 올릴 자리가 없어 다음 쪽을 부를 길이 없다 */
+    if (olderCursor.current !== null && el.scrollHeight <= el.clientHeight) readOlder();
+  }, [chat.messages, prependTick, readOlder]);
 
   /* 화면이 넓어져 사이드바·현황판이 붙박이가 되면 서랍은 남아 있을 이유가 없다.
      열어 둔 채로 창을 넓히면 같은 것이 두 번 보인다 */
@@ -863,8 +934,21 @@ export function CaseWorkspacePage() {
           </div>
         )}
 
-        <div className="chat-scroll flex flex-1 flex-col px-4 pt-4 pb-4 md:px-6 md:pb-6">
+        <div
+          ref={chatRef}
+          onScroll={(e) => {
+            /* 맨 위에 닿기 전에 미리 부른다 — 닿고 나서 부르면 빈 자리가 보인다 */
+            if (e.currentTarget.scrollTop < 240) readOlder();
+          }}
+          className="chat-scroll flex flex-1 flex-col px-4 pt-4 pb-4 md:px-6 md:pb-6"
+        >
           <div className="mx-auto flex w-full max-w-140 flex-col items-start gap-5 md:mx-0 md:max-w-none md:gap-7">
+            {/* 지난 대화를 읽는 중 — 글자는 붙이지 않는다 (건수 세기는 04 문서 C9로 빠졌다) */}
+            {olderBusy && (
+              <div className="flex w-full justify-center py-2 text-muted">
+                <Dots />
+              </div>
+            )}
             {chat.messages.map((message) => (
               <MessageItem
                 key={message.id}

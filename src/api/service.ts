@@ -16,6 +16,13 @@ import type { Precedent, PrecedentDetail, Verdict } from '@/domain/verdict';
  */
 
 /** 실시간 채널이 물어다 주는 것 (명세 §6) */
+/** 대화 한 쪽. `hasMore`가 참이면 `nextCursor`로 더 오래된 쪽을 받는다 */
+export interface MessagePage {
+  items: ChatMessage[];
+  hasMore: boolean;
+  nextCursor: string | null;
+}
+
 export interface CaseEvents {
   /** 새 카드가 왔다. 대화 맨 뒤에 붙인다 */
   message?: (message: ChatMessage) => void;
@@ -88,7 +95,12 @@ export interface CaseService {
   deleteCase(caseId: string): Promise<void>;
 
   /* ── 대화 ─────────────────────────────────────────────── */
-  listMessages(caseId: string): Promise<ChatMessage[]>;
+  /**
+   * 대화 한 쪽 — **오래된 것 → 최신 순** (명세 C-1).
+   * 아무것도 안 넣으면 가장 최근 쪽이 온다. 더 위로 올라가려면 앞 쪽이 준
+   * `nextCursor`를 `before`에 넣는다. 총 건수는 오지 않는다 — 셀 수 없다(04 문서 C9).
+   */
+  listMessages(caseId: string, before?: string): Promise<MessagePage>;
   /** 보내고 나면 답은 subscribe로 온다. 돌려주는 건 내가 친 글 한 장뿐이다 */
   sendMessage(caseId: string, text: string): Promise<ChatMessage>;
   uploadVideo(

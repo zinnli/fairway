@@ -3,11 +3,11 @@ import type {
   CaseDetail,
   CaseEvents,
   CaseService,
+  MessagePage,
   Session,
   UploadResult,
 } from '../service';
 import type { Case, CaseSummary, VideoRef } from '@/domain/case';
-import type { ChatMessage } from '@/domain/message';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { Precedent, Verdict } from '@/domain/verdict';
 
@@ -85,6 +85,9 @@ function saveAs(blob: Blob, filename: string) {
   a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
+
+/** 한 쪽에 몇 장인가 (명세 C-1 기본값은 20). 목과 같은 값을 쓴다 */
+const MESSAGE_PAGE = 30;
 
 export const httpService: CaseService = {
   /* ── 인증 ─────────────────────────────────────────────── */
@@ -167,8 +170,21 @@ export const httpService: CaseService = {
 
   /* ── 대화 ─────────────────────────────────────────────── */
 
-  listMessages: async (caseId): Promise<ChatMessage[]> =>
-    toMessages((await messagesApi.list(caseId, { limit: 50 })).items),
+  /**
+   * 한 쪽만 읽는다 (명세 C-1). 대화가 길면 위로 올려서 더 받는다 —
+   * 한 번에 다 받으려 들면 오래된 사건일수록 첫 화면이 늦어진다.
+   *
+   * 카드 수는 서버가 준 것과 다를 수 있다 — 화면이 모르는 종류는 걸러지고
+   * `sent` 한 장은 두 장이 된다(expandMessage). 그래서 커서는 서버 것을 그대로 쓴다.
+   */
+  listMessages: async (caseId, before): Promise<MessagePage> => {
+    const page = await messagesApi.list(caseId, { before, limit: MESSAGE_PAGE });
+    return {
+      items: toMessages(page.items),
+      hasMore: page.hasMore,
+      nextCursor: page.nextCursor,
+    };
+  },
 
   sendMessage: async (caseId, text) => {
     const { message } = await messagesApi.send(caseId, text);

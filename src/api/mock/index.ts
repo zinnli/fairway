@@ -49,6 +49,9 @@ const newCaseId = () =>
 const newMessageId = () => `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const now = () => new Date().toISOString();
 
+/** 한 쪽에 몇 장인가. 서버 기본값(20)보다 조금 넉넉하게 — 전송 계층과 같은 값이다 */
+const MESSAGE_PAGE = 30;
+
 /* 반박의견서 제목은 서버가 접수번호로 만든다 (명세 G-2 `subjectAuto`) — 목도 같이 군다.
    접수번호가 없을 때의 문장까지 명세 예시 그대로다 (5-G G-2 응답) */
 const autoSubject = (claimNo: string | null) =>
@@ -276,7 +279,21 @@ export const mockService: CaseService = {
     delete jobs[caseId];
   },
 
-  listMessages: async (caseId) => [...(logs[caseId] ?? [])],
+  /* 서버처럼 한 쪽씩 준다 (명세 C-1) — 대화가 길 때의 화면을 목에서도 볼 수 있게 */
+  listMessages: async (caseId, before) => {
+    const all = logs[caseId] ?? [];
+    const found = before ? all.findIndex((m) => m.id === before) : -1;
+    /* 커서를 못 찾으면 더 줄 것이 없다고 답한다 — 같은 쪽을 다시 주면 화면이
+       이미 들고 있는 카드를 또 받아 위로 올리기가 헛돈다 */
+    if (before && found < 0) return { items: [], hasMore: false, nextCursor: null };
+    const stop = found >= 0 ? found : all.length;
+    const start = Math.max(0, stop - MESSAGE_PAGE);
+    return {
+      items: all.slice(start, stop),
+      hasMore: start > 0,
+      nextCursor: start > 0 ? all[start].id : null,
+    };
+  },
 
   sendMessage: async (caseId, text) => {
     const c = find(caseId);
