@@ -8,11 +8,14 @@ import { cn } from '@/lib/cn';
  * 올라가는 중 → 완료(video)로 같은 자리에서 모양만 바뀐다.
  * 취소·오류는 9/3에 빠져서 실패 모양이 없다 (04 문서 C4).
  *
+ * 시안의 280/360은 **최소** 폭이다 — 파일 이름은 한 줄로 두므로, 긴 이름이 오면
+ * 대화 칸 너비까지 늘어난다. 짧은 이름일 때 보이는 모양은 시안 그대로다.
+ *
  * 방향(flex-col·flex-row)은 쓰는 쪽에서 정한다 — cn은 그냥 이어 붙이는 함수라
  * 둘을 같이 주면 어느 쪽이 이길지 CSS 순서에 맡기게 된다.
  */
 const CHIP =
-  'box-border flex w-70 max-w-full min-w-0 self-end rounded-lg rounded-br-xs px-4 py-2 md:w-90';
+  'box-border flex w-fit min-w-70 max-w-full self-end rounded-lg rounded-br-xs px-4 py-2 md:min-w-90';
 
 /**
  * 업로드가 끝난 영상 (h16). 누르면 영상 뷰어가 열린다 (F01).
@@ -67,8 +70,15 @@ export function UploadingCard({
 
   return (
     <div className={cn(CHIP, 'flex-col gap-2 bg-brand-tint')}>
+      <span className="truncate text-[13.5px] font-semibold text-ink">{fileName}</span>
+      <div className="h-2 overflow-hidden rounded-full bg-line-2">
+        <div
+          className="h-full rounded-full bg-brand"
+          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
+        />
+      </div>
       <div className="flex items-baseline justify-between gap-2">
-        <span className="min-w-0 truncate text-[13.5px] font-semibold text-ink">{fileName}</span>
+        <p className="text-[12.5px] text-muted">올리는 중…</p>
         {/* 크기를 아직 모르면(예시 영상을 받아 오는 중) 지어내지 않고 뺀다 */}
         {sizeBytes > 0 && (
           <span className="tnum shrink-0 text-[12.5px] text-muted">
@@ -76,13 +86,6 @@ export function UploadingCard({
           </span>
         )}
       </div>
-      <div className="h-2 overflow-hidden rounded-full bg-line-2">
-        <div
-          className="h-full rounded-full bg-brand"
-          style={{ width: `${Math.min(100, Math.max(0, progress))}%` }}
-        />
-      </div>
-      <p className="text-[12.5px] text-muted">올리는 중…</p>
     </div>
   );
 }

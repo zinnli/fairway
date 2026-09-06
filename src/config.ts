@@ -37,8 +37,10 @@ export const VIDEO_LIMITS = {
  */
 export const SAMPLE_VIDEOS: string[] = [
   'bb_1_200514_vehicle_141_062.mp4',
+  'bb_1_220107_vehicle_147_087.mp4',
+  'bb_1_220316_vehicle_204_22802.mp4',
+  'bb_1_220518_vehicle_212_21366.mp4',
   'bb_1_220804_vehicle_116_067.mp4',
-  'cc_3_200203_vehicle_311_029.mp4',
 ];
 
 /** 예시 영상이 놓인 자리 */

@@ -23,6 +23,7 @@ interface Anchor {
   bottom: number;
   left: number;
   viewportH: number;
+  viewportW: number;
 }
 
 export function SampleVideoPicker({
@@ -35,17 +36,25 @@ export function SampleVideoPicker({
 }) {
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const [flipped, setFlipped] = useState(false);
+  /* 오른쪽으로 삐져나갈 때만 왼쪽으로 당긴 자리. null이면 단추에 그대로 붙는다 */
+  const [pulled, setPulled] = useState<number | null>(null);
   const btnRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const open = anchor !== null;
 
-  /* 아래로 열면 화면 밖으로 나가는 경우 위로 뒤집는다.
+  /* 화면 밖으로 나가면 아래로 열던 것을 위로 뒤집고, 오른쪽으로 넘치면 왼쪽으로 당긴다.
      paint 전에 도는 훅이라 위치가 한 번 튀어 보이지 않는다 */
   useLayoutEffect(() => {
-    if (!anchor || flipped) return;
+    if (!anchor) return;
     const el = listRef.current;
-    if (el && el.getBoundingClientRect().bottom > anchor.viewportH - INSET) setFlipped(true);
-  }, [anchor, flipped]);
+    if (!el) return;
+    const rect = el.getBoundingClientRect();
+    if (!flipped && rect.bottom > anchor.viewportH - INSET) setFlipped(true);
+    /* 한 번만 당긴다 — 당긴 뒤 다시 재면 끝없이 되풀이된다 */
+    if (pulled === null && rect.right > anchor.viewportW - INSET) {
+      setPulled(Math.max(INSET, anchor.viewportW - INSET - rect.width));
+    }
+  }, [anchor, flipped, pulled]);
 
   /* 대화를 스크롤하거나 창을 줄이면 목록이 제 단추에서 떨어져 나가므로 닫는다 */
   useEffect(() => {
@@ -71,11 +80,13 @@ export function SampleVideoPicker({
     const rect = btnRef.current?.getBoundingClientRect();
     if (!rect) return;
     setFlipped(false);
+    setPulled(null);
     setAnchor({
       top: rect.top,
       bottom: rect.bottom,
       left: rect.left,
       viewportH: window.innerHeight,
+      viewportW: window.innerWidth,
     });
   };
 
@@ -108,10 +119,10 @@ export function SampleVideoPicker({
             aria-label="예시 영상"
             style={
               flipped
-                ? { bottom: anchor.viewportH - anchor.top + GAP, left: anchor.left }
-                : { top: anchor.bottom + GAP, left: anchor.left }
+                ? { bottom: anchor.viewportH - anchor.top + GAP, left: pulled ?? anchor.left }
+                : { top: anchor.bottom + GAP, left: pulled ?? anchor.left }
             }
-            className="fixed z-20 flex max-h-90 w-72 flex-col overflow-y-auto rounded-md border border-line bg-surface py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
+            className="fixed z-20 flex max-h-90 w-88 max-w-[calc(100vw-16px)] flex-col overflow-y-auto rounded-md border border-line bg-surface py-1 shadow-[0_8px_24px_rgba(0,0,0,0.14)]"
           >
             <p className="mb-1 border-b border-line-2 px-4 py-2 text-[12px] leading-[1.35] text-muted">
               올릴 영상이 없으면 골라서 써 보세요
@@ -131,7 +142,7 @@ export function SampleVideoPicker({
                 <span className="flex shrink-0 text-muted" aria-hidden>
                   <Icon name="video" size={16} />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[13.5px] text-ink">{file}</span>
+                <span className="min-w-0 flex-1 wrap-anywhere text-[13.5px] text-ink">{file}</span>
               </button>
             ))}
           </div>
