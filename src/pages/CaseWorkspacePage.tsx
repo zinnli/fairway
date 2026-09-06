@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useReducer, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router';
 import { isApiError, service, type ActiveJob, type ApiErrorAction } from '@/api';
+import { Dots } from '@/components/ui/Dots';
 import { Drawer } from '@/components/ui/Drawer';
 import { PrintableStatement, StatementDialog } from '@/features/documents/StatementDialog';
 import { RebuttalDialog } from '@/features/documents/RebuttalDialog';
 import { PrecedentDialog, ProcessDialog } from '@/features/workspace/dialogs/GroundDialogs';
 import { ErrorDialog, SendConfirmDialog } from '@/features/workspace/dialogs/AlertDialogs';
 import { VideoDialog } from '@/features/workspace/dialogs/VideoDialog';
-import { sampleVideoUrl, VIDEO_LIMITS } from '@/config';
+import { DISCLAIMER, sampleVideoUrl, VIDEO_LIMITS } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { ChatMessage, MessageBody } from '@/domain/message';
 import type { Precedent, PrecedentDetail } from '@/domain/verdict';
@@ -90,18 +91,39 @@ export function CaseWorkspacePage() {
    * 그림 주소의 서명은 10분짜리라 **열 때마다 새로 받는 지금 방식이 곧 갱신**이다.
    */
   const [precedentDoc, setPrecedentDoc] = useState<PrecedentDetail | null>(null);
+  /* 마지막으로 연 사례. 느린 응답이 나중에 도착해 다른 사례의 팝업을 덮지 않게 한다 */
+  const precedentWant = useRef<string | null>(null);
   const pop = (which: 'precedent' | 'process', precedent?: Precedent) => {
     setPopup({ key: viewKey, which, precedent });
     if (which === 'precedent' && precedent) {
       setPrecedentDoc(null);
+      const want = precedent.no;
+      precedentWant.current = want;
       void service
         .getPrecedent(caseId, precedent)
-        .then(setPrecedentDoc)
-        .catch(() => setPrecedentDoc(null));
+        .then((doc) => {
+          if (precedentWant.current === want) setPrecedentDoc(doc);
+        })
+        .catch(() => {
+          if (precedentWant.current === want) setPrecedentDoc(null);
+        });
     }
   };
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  /* 대화는 한 쪽씩 읽는다 (명세 C-1). 위로 올리면 더 오래된 쪽을 이어 붙인다 */
+  const chatRef = useRef<HTMLDivElement>(null);
+  /** 다음에 읽을 자리. null이면 더 위가 없다 */
+  const olderCursor = useRef<string | null>(null);
+  /** 읽는 중인지. 스크롤은 초당 몇 번씩 불려서 state로는 늦는다 */
+  const readingOlder = useRef(false);
+  const [olderBusy, setOlderBusy] = useState(false);
+  /** 앞에 붙이기 직전의 높이 — 붙인 뒤 그만큼 내려 보던 자리를 지킨다 */
+  const keepAnchor = useRef<number | null>(null);
+  /* 붙였다는 사실 자체를 상태로 남긴다. 겹치기만 해서 대화가 그대로면 리듀서가
+     같은 값을 돌려주는데, 그러면 자리 지키기 효과가 돌지 않아 적어 둔 높이가
+     남고 그 뒤로 새 카드가 와도 화면이 안 내려간다 */
+  const [prependTick, setPrependTick] = useState(0);
   const pickVideo = () => fileRef.current?.click();
 
   const reloadList = useCaseStore((s) => s.load);
@@ -135,6 +157,9 @@ export function CaseWorkspacePage() {
   /* 사건 한 장을 다시 읽는다. 이벤트가 끊겼을 때와 화면에 처음 들어올 때 쓴다 */
   const refresh = useCallback(async () => {
     const { item: fresh, activeJob: job } = await service.getCase(caseId);
+    /* 기다리는 사이 다른 사건으로 옮겼으면 버린다 — setLoaded는 id로 걸러지지만
+       setActiveJob은 무방비라, 이전 사건의 "분석 중"이 새 사건을 잠가 버린다 */
+    if (activeCase.current !== caseId) return fresh;
     setLoaded({ id: caseId, item: fresh });
     setActiveJob(job);
     void reloadList();
@@ -324,6 +349,14 @@ export function CaseWorkspacePage() {
           await call();
         } catch (e) {
           if (activeCase.current !== caseId) return;
+          /* 409(JOB_ALREADY_RUNNING)는 같은 일이 이미 돌고 있다는 뜻이다(명세 §2.6).
+             Job을 내리면 돌던 로딩 카드가 사라졌다가 잠시 뒤 카드가 "실패했는데
+             완성되는" 화면이 된다 — 서 있는 그대로 두고, 서버가 정해 준 문장
+             ("이미 진행 중이에요", retryable ✕라 닫기만 나온다)으로 알린다 */
+          if (isApiError(e) && e.status === 409) {
+            showFailure(e, () => void go());
+            return;
+          }
           /* 내가 세운 것만 내린다 */
           setActiveJob((cur) => (cur?.kind === kind ? null : cur));
           showFailure(e, () => void go());
@@ -370,12 +403,17 @@ export function CaseWorkspacePage() {
     async (draft: Rebuttal) => {
       setSending(true);
       try {
-        /* 보내기 전 고친 내용을 먼저 저장하고, 최종 내용은 서버가 읽는다 */
-        await service.updateRebuttal(caseId, draft);
+        /* 보내기 전 고친 내용을 먼저 저장하고, 최종 내용은 서버가 읽는다.
+           제목은 빼고 보낸다 — 서버가 접수번호로 만드는 값이라(G-2 subjectAuto)
+           화면이 만든 문장을 얹으면 서버가 "사용자가 직접 고쳤다"로 보고 자동 갱신을 멈춘다 */
+        const { subject: _serverMakesIt, ...patch } = draft;
+        await service.updateRebuttal(caseId, patch);
         await service.sendRebuttal(caseId);
         setConfirmSend(null);
         setDrawer(null);
-        await refresh();
+        /* 발송은 이미 성공했다 — 여기서 새로 고침이 실패해도 h36(발송 실패)으로
+           이어지면 재발송을 유도하게 된다. 최신 상태는 이벤트가 마저 맞춘다 */
+        await refresh().catch(() => {});
       } catch (e) {
         /* 쓴 내용과 첨부는 그대로 두고 확인 창으로 돌려보낸다 (h36) */
         showFailure(e, () => {
@@ -449,17 +487,25 @@ export function CaseWorkspacePage() {
     loadingPhase.current = null;
     dropReplyCard();
     fetchedVersion.current = null;
+    /* 이전 사건의 대화를 즉시 내린다 — 새 대화가 올 때까지 남겨 두면 남의 카드가
+       그대로 보이고, 카드 단추는 이미 이 사건 id에 묶여 있어 엉뚱한 사건에 요청이 나간다 */
+    dispatch({ type: 'reset', messages: [] });
+    olderCursor.current = null;
+    keepAnchor.current = null;
 
     Promise.all([service.getCase(caseId), service.listMessages(caseId)])
       .then(([{ item: c, activeJob: job }, past]) => {
         if (!alive) return;
         setLoaded({ id: caseId, item: c });
         setActiveJob(job);
+        olderCursor.current = past.nextCursor;
         /* 지난 대화를 그대로 되살린다. 아직 아무 말도 오가지 않은 사건은
            접수 안내 한 장으로 시작한다 (h12) */
         dispatch({
           type: 'reset',
-          messages: past.length ? past : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
+          messages: past.items.length
+            ? past.items
+            : [{ id: nextId(), at: now(), role: 'ai', kind: 'guide' }],
         });
 
         stop = service.subscribe(caseId, {
@@ -492,14 +538,52 @@ export function CaseWorkspacePage() {
             setActiveJob(activeJobNow);
             void reloadList();
           },
-          /* 채널이 끊겼고 되살리지 못했다 — 사건과 대화를 다시 읽어 맞춘다 */
+          /* 끊겼다 새로 붙었다 — 그 사이 이벤트는 재전송되지 않는다(sse.ts). 사건과
+             대화를 다시 읽어 맞춘다. 채널은 살아 있으니 Job과 잠금은 건드리지 않는다 */
+          regained: () => {
+            dropReplyCard();
+            refresh().catch(() => {});
+            service
+              .listMessages(caseId)
+              .then((again) => {
+                if (activeCase.current !== caseId || !again.items.length) return;
+                olderCursor.current = again.nextCursor;
+                dispatch({ type: 'reset', messages: again.items });
+                /* reset이 로컬 로딩 카드를 지웠다 — Job이 아직 돌면 같은 id로 도로 세운다 */
+                if (loadingCardId.current !== null && loadingPhase.current !== null) {
+                  dispatch({
+                    type: 'append',
+                    message: {
+                      id: loadingCardId.current,
+                      at: now(),
+                      role: 'ai',
+                      kind: 'analyzing',
+                      phase: loadingPhase.current,
+                    },
+                  });
+                }
+              })
+              .catch(() => {});
+          },
+          /* 채널이 끊겼고 되살리지 못했다 — 사건과 대화를 다시 읽어 맞춘다.
+             Job이 돌고 있어도 끝났다는 이벤트는 이제 못 받으므로 activeJob을
+             내린다 — 안 내리면 로딩 카드와 입력 잠금이 사건을 떠날 때까지 안 풀린다 */
           lost: () => {
-            void refresh();
-            void service.listMessages(caseId).then((again) => {
-              if (activeCase.current === caseId && again.length) {
-                dispatch({ type: 'reset', messages: again });
-              }
-            });
+            dropReplyCard();
+            refresh()
+              .catch(() => {})
+              .finally(() => {
+                if (activeCase.current === caseId) setActiveJob(null);
+              });
+            service
+              .listMessages(caseId)
+              .then((again) => {
+                if (activeCase.current === caseId && again.items.length) {
+                  olderCursor.current = again.nextCursor;
+                  dispatch({ type: 'reset', messages: again.items });
+                }
+              })
+              .catch(() => {});
           },
         });
         /* 읽는 사이에 사건을 떠났으면 붙자마자 뗀다 */
@@ -557,6 +641,16 @@ export function CaseWorkspacePage() {
   const rewriting = activeJob?.kind === 'report';
 
   /**
+   * 분석·판정이 도는 동안은 **입력 바를 잠근다** (명세 §5 activeJob).
+   * 서류 작업(report·rebuttal)은 잠그지 않는다 — 그건 단추만 잠긴다.
+   *
+   * 결과를 아직 못 본 채로 한 말은 맥락이 어긋나고, 답 대기 카드가 로딩 카드 옆에
+   * 하나 더 서게 된다. 무엇을 기다리는지에 따라 안내 글자도 갈아 끼운다.
+   */
+  const waitingFor =
+    activeJob?.kind === 'analysis' || activeJob?.kind === 'verdict' ? activeJob.kind : null;
+
+  /**
    * PDF — 서버가 만들어 준다. 목은 인쇄 CSS로 대신한다.
    * 어느 쪽이든 html2canvas는 쓰지 않는다 (한글이 이미지로 뭉개진다).
    */
@@ -585,15 +679,22 @@ export function CaseWorkspacePage() {
   const openRebuttal = useCallback(async () => {
     /* **받아 온 뒤에 연다.** 열어 놓고 나중에 갈아 끼우면, 그 사이 사용자가 적어 넣은
        받는이·접수번호·본문이 새 초안으로 덮여 지워진다 */
-    try {
-      const full = await service.getRebuttal(caseId);
-      if (activeCase.current !== caseId) return;
-      setFullRebuttal({ id: caseId, doc: full });
-    } catch {
-      /* 못 받으면 카드가 아는 만큼만 보여 준다 */
-    }
-    setDrawer({ key: viewKey, which: 'rebuttal' });
-  }, [caseId, viewKey]);
+    const run = async () => {
+      try {
+        const full = await service.getRebuttal(caseId);
+        if (activeCase.current !== caseId) return;
+        setFullRebuttal({ id: caseId, doc: full });
+      } catch (e) {
+        /* 경위서와 달리 **열어 주지 않는다** — 카드의 body는 잘린 미리보기라,
+           그걸로 열었다가 그대로 보내면 서버의 온전한 전문이 미리보기로 덮여 발송된다 */
+        if (activeCase.current !== caseId) return;
+        showFailure(e, () => void run());
+        return;
+      }
+      setDrawer({ key: viewKey, which: 'rebuttal' });
+    };
+    await run();
+  }, [caseId, viewKey, showFailure]);
 
   /**
    * PDF 받기 — 서버가 만들고(F-5) 인증을 붙여 받는다(F-6).
@@ -611,9 +712,62 @@ export function CaseWorkspacePage() {
     await run();
   }, [caseId, showFailure]);
 
+  /* 개수가 아니라 "맨 끝이 무엇인가"를 본다 — revise(다시 쓴 서류·갱신된 판정을 맨
+     아래로 옮김)는 개수를 안 바꿔서, 개수만 보면 옮겨 놓고 화면이 안 내려간다 */
+  const lastMessageId = chat.messages.at(-1)?.id ?? null;
   useEffect(() => {
+    /* 위로 올려서 지난 대화를 읽어 온 참이면 내려가지 않는다 — 보던 자리를 뺏는다 */
+    if (keepAnchor.current !== null) return;
     bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [chat.messages.length]);
+  }, [lastMessageId]);
+
+  /**
+   * 지난 대화를 한 쪽 더 읽어 온다 (명세 C-1 · 시안 h26 "위로 올려서 보기").
+   * 건수는 세지 않는다 — 04 문서 C9로 빠졌고 서버도 총 건수를 주지 않는다.
+   */
+  const readOlder = useCallback(() => {
+    const el = chatRef.current;
+    if (!el || olderCursor.current === null || readingOlder.current) return;
+    readingOlder.current = true;
+    setOlderBusy(true);
+    const want = caseId;
+
+    const step = async (): Promise<void> => {
+      const cursor = olderCursor.current;
+      if (cursor === null) return;
+      const page = await service.listMessages(caseId, cursor);
+      if (activeCase.current !== want) return;
+      olderCursor.current = page.nextCursor;
+      /* 화면이 아는 카드가 한 장도 없는 쪽이면(전부 모르는 종류) 다음 쪽으로 넘어간다.
+         여기서 멈추면 대화가 그려지지 않은 채로 더 읽을 길이 끊긴다 */
+      if (!page.items.length) return step();
+      /* 앞에 카드가 붙으면 그만큼 아래로 밀린다. 붙이기 직전 높이를 적어 두고
+         그린 뒤에 차이만큼 내려서 보던 자리를 그대로 둔다 */
+      keepAnchor.current = el.scrollHeight;
+      dispatch({ type: 'prepend', messages: page.items });
+      setPrependTick((n) => n + 1);
+    };
+
+    step()
+      /* 못 읽어도 조용히 둔다 — 지난 대화는 아래 대화를 막지 않는다 */
+      .catch(() => {})
+      .finally(() => {
+        readingOlder.current = false;
+        setOlderBusy(false);
+      });
+  }, [caseId]);
+
+  useLayoutEffect(() => {
+    const el = chatRef.current;
+    if (!el) return;
+    if (keepAnchor.current !== null) {
+      el.scrollTop += el.scrollHeight - keepAnchor.current;
+      keepAnchor.current = null;
+      return;
+    }
+    /* 읽어 온 쪽이 화면을 다 못 채우면 올릴 자리가 없어 다음 쪽을 부를 길이 없다 */
+    if (olderCursor.current !== null && el.scrollHeight <= el.clientHeight) readOlder();
+  }, [chat.messages, prependTick, readOlder]);
 
   /* 화면이 넓어져 사이드바·현황판이 붙박이가 되면 서랍은 남아 있을 이유가 없다.
      열어 둔 채로 창을 넓히면 같은 것이 두 번 보인다 */
@@ -643,16 +797,36 @@ export function CaseWorkspacePage() {
     null;
   const statement = lastOf('statementDraft')?.doc ?? null;
   const rebuttal = lastOf('rebuttalDraft')?.doc ?? null;
-  /* 만들기 단추를 내리는 기준은 셋 다 같다 — **초안 카드가 대화에 붙었는가**.
-     보낸 뒤에도 초안 카드는 로그에 남으므로 그대로 내려가 있다 */
-  const rebuttalExists = rebuttal !== null;
+  /**
+   * 서류가 **있는지**는 대화만 보고 판단하지 않는다.
+   *
+   * 대화는 한 쪽(30장)만 들고 있어서, 초안을 만든 뒤 이야기가 길어지면 초안 카드가
+   * 창 밖으로 밀려난다. 그때 대화만 보면 "아직 없다"가 되어 현황판이 [만들기]를
+   * 다시 내주고, 누르면 이미 있는 서류를 또 만든다(409 아니면 새 버전).
+   * 있고 없고는 사건이 안다 — 진행 단계로 받는다.
+   *
+   * 내용(version·장수·본문)은 여전히 카드에서 온다. 카드가 없으면 열 때 받아 온다.
+   */
+  const statementExists = statement !== null || item?.stages.statement === '완료';
+  const rebuttalExists = rebuttal !== null || (item != null && item.stages.rebuttal !== '대기');
   /* 보냈는지는 발송 카드로 안다 — 초안 카드의 sentAt은 서버가 늘 null로 준다 (map.ts) */
   const rebuttalSent = lastOf('sent') !== null || rebuttal?.sentAt != null;
-  /* 참고용 고지는 화면당 한 번(규칙 0.2). 판정·경위서 카드가 이미 달고 나온다 */
+  /**
+   * 참고용 고지는 화면당 한 번(규칙 0.2). **자리는 고정이 아니다.**
+   *
+   * 시안을 전 화면 훑어보면 자리가 둘로 갈린다 — 대화 맨 끝이 판정 카드(h21·h21b)나
+   * 경위서 초안 카드(h26)이면 그 카드가 달고 나오고, 그 밖에는 전부 현황판 하단이다
+   * (h12~h20 · h27 · h28 · h29). 반박의견서 초안·발송 카드는 달지 않는다.
+   *
+   * **맨 끝일 때만이다.** 로그 어디서든 판정 카드를 찾아 달면, 판정 뒤로 대화가
+   * 이어졌을 때 고지가 위로 흘러가 화면에서 사라진다 — 현황판도 "이미 달렸다"고
+   * 보고 비워 두기 때문이다.
+   */
+  const lastCard = chat.messages.at(-1) ?? null;
   const disclaimerCardId =
-    [...chat.messages]
-      .reverse()
-      .find((m) => m.kind === 'verdict' || m.kind === 'statementDraft')?.id ?? null;
+    lastCard && (lastCard.kind === 'verdict' || lastCard.kind === 'statementDraft')
+      ? lastCard.id
+      : null;
 
   /**
    * [영상 올리기]가 설 자리 — 화면 전체에서 딱 하나다.
@@ -772,8 +946,21 @@ export function CaseWorkspacePage() {
           </div>
         )}
 
-        <div className="chat-scroll flex flex-1 flex-col px-4 pt-4 pb-4 md:px-6 md:pb-6">
+        <div
+          ref={chatRef}
+          onScroll={(e) => {
+            /* 맨 위에 닿기 전에 미리 부른다 — 닿고 나서 부르면 빈 자리가 보인다 */
+            if (e.currentTarget.scrollTop < 240) readOlder();
+          }}
+          className="chat-scroll flex flex-1 flex-col px-4 pt-4 pb-4 md:px-6 md:pb-6"
+        >
           <div className="mx-auto flex w-full max-w-140 flex-col items-start gap-5 md:mx-0 md:max-w-none md:gap-7">
+            {/* 지난 대화를 읽는 중 — 글자는 붙이지 않는다 (건수 세기는 04 문서 C9로 빠졌다) */}
+            {olderBusy && (
+              <div className="flex w-full justify-center py-2 text-muted">
+                <Dots />
+              </div>
+            )}
             {chat.messages.map((message) => (
               <MessageItem
                 key={message.id}
@@ -786,7 +973,7 @@ export function CaseWorkspacePage() {
                   sampleLoading: fetchingSample,
                   onOpenPrecedent: (p) => pop('precedent', p),
                   onCreateStatement: () => void createStatement(),
-                  statementExists: statement !== null,
+                  statementExists,
                   onOpenStatement: () => void openStatement(),
                   onPrintStatement: () => void savePdf(),
                   onRewriteStatement: () => void rewriteStatement(),
@@ -800,6 +987,11 @@ export function CaseWorkspacePage() {
                 }}
               />
             ))}
+            {/* 좁은 화면에서는 현황판이 서랍이라, 카드가 고지를 달지 않으면 어디에도 안 보인다.
+                1024 이상에서는 현황판이 달고 있으므로 감춘다 (화면당 한 번 · 규칙 0.2) */}
+            {disclaimerCardId === null && (
+              <p className="w-full text-[12.5px] leading-[1.5] text-muted lg:hidden">{DISCLAIMER}</p>
+            )}
             <div ref={bottomRef} />
           </div>
         </div>
@@ -808,10 +1000,15 @@ export function CaseWorkspacePage() {
         <Composer
           onSend={(text) => void sendText(text)}
           onPickVideo={pickVideo}
+          disabled={waitingFor !== null}
           placeholder={
-            chat.messages.some((m) => m.role === 'user')
-              ? '메시지를 입력하세요'
-              : '사고 상황을 설명해 주세요'
+            waitingFor === 'analysis'
+              ? '영상을 다 본 뒤에 이어서 말씀해 주세요'
+              : waitingFor === 'verdict'
+                ? '판정이 끝나면 이어서 말씀해 주세요'
+                : chat.messages.some((m) => m.role === 'user')
+                  ? '메시지를 입력하세요'
+                  : '사고 상황을 설명해 주세요'
           }
         />
       </div>
@@ -823,9 +1020,13 @@ export function CaseWorkspacePage() {
             item={item}
             statement={statement}
             rebuttal={rebuttal}
+            statementBusy={activeJob?.kind === 'report'}
+            rebuttalBusy={activeJob?.kind === 'rebuttal'}
             showDisclaimer={disclaimerCardId === null}
-            onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
-            onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
+            statementExists={statementExists}
+            rebuttalExists={rebuttalExists}
+            onOpenStatement={() => (statementExists ? void openStatement() : void createStatement())}
+            onOpenRebuttal={() => (rebuttalExists ? void openRebuttal() : void createRebuttal())}
           />
         </div>
       )}
@@ -885,7 +1086,12 @@ export function CaseWorkspacePage() {
         retryable={failure?.retryable}
         actions={failure?.actions}
         onClose={() => setFailure(null)}
-        onRetry={() => failure?.retry()}
+        onRetry={() => {
+          /* 닫고 나서 다시 탄다 — 열어 두면 성공해도 창이 남아 또 누르면 중복 요청이 나간다.
+             다시 실패하면 showFailure가 새 내용으로 도로 연다 */
+          setFailure(null);
+          failure?.retry();
+        }}
         onAction={(action) => {
           setFailure(null);
           if (action.type === 'retry_send') failure?.retry();
@@ -906,9 +1112,13 @@ export function CaseWorkspacePage() {
             item={item}
             statement={statement}
             rebuttal={rebuttal}
+            statementBusy={activeJob?.kind === 'report'}
+            rebuttalBusy={activeJob?.kind === 'rebuttal'}
             showDisclaimer={disclaimerCardId === null}
-            onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
-            onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
+            statementExists={statementExists}
+            rebuttalExists={rebuttalExists}
+            onOpenStatement={() => (statementExists ? void openStatement() : void createStatement())}
+            onOpenRebuttal={() => (rebuttalExists ? void openRebuttal() : void createRebuttal())}
           />
         )}
       </Drawer>

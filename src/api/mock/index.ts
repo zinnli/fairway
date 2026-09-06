@@ -2,6 +2,7 @@ import type { Case, VideoRef } from '@/domain/case';
 import { emptyStages } from '@/domain/case';
 import type { ChatMessage, MessageBody } from '@/domain/message';
 import type { Statement } from '@/domain/document';
+import type { Verdict } from '@/domain/verdict';
 import type { ActiveJob, CaseDetail, CaseEvents, CaseService, Session } from '../service';
 import {
   ANALYSIS_SUMMARY,
@@ -47,6 +48,22 @@ const newCaseId = () =>
   `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 4)}`;
 const newMessageId = () => `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const now = () => new Date().toISOString();
+
+/** 한 쪽에 몇 장인가. 서버 기본값(20)보다 조금 넉넉하게 — 전송 계층과 같은 값이다 */
+const MESSAGE_PAGE = 30;
+
+/* 반박의견서 제목은 서버가 접수번호로 만든다 (명세 G-2 `subjectAuto`) — 목도 같이 군다.
+   접수번호가 없을 때의 문장까지 명세 예시 그대로다 (5-G G-2 응답) */
+const autoSubject = (claimNo: string | null) =>
+  claimNo?.trim()
+    ? `과실비율 재검토 요청 (접수번호 ${claimNo.trim()})`
+    : '과실비율 재검토 요청 (접수번호는 아직 안 넣었어요)';
+const isAutoSubject = (subject: string) => /^과실비율 재검토 요청(\s*\([^()]*\))?$/.test(subject.trim());
+/* 서버가 F-3에서 만들어 주는 날짜 문구("08-25"). 목이 서버 노릇을 하니 목이 만든다 */
+const dateLabel = () => {
+  const d = new Date();
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function loadDemo() {
@@ -124,10 +141,19 @@ async function runJudge(caseId: string) {
   await wait(2400);
   if (!find(caseId)) return;
 
-  c.verdict = DEMO_VERDICT;
+  /* 갓 내린 판정은 상대 보험사 주장을 모른다 — 판정 뒤에 사용자가 말하면
+     서버가 카드를 갱신한다(05 수정요청 9/6). 목도 같은 순서를 밟는다 */
+  const fresh: Verdict = {
+    ...DEMO_VERDICT,
+    opponentClaim: null,
+    /* null이어도 안내 문장은 항상 온다 (05 수정요청 표) — 카드가 이 줄로 알려 달라고 청한다 */
+    opponentClaimNote:
+      '상대 보험사가 제시한 과실비율은 아직 없어요. 채팅으로 알려주시면 판정과 나란히 비교해 드릴게요.',
+  };
+  c.verdict = fresh;
   c.stages = { ...c.stages, verdict: '완료' };
   c.status = '판정 완료';
-  push(caseId, { role: 'ai', kind: 'verdict', verdict: DEMO_VERDICT });
+  push(caseId, { role: 'ai', kind: 'verdict', verdict: fresh });
   setJob(caseId, null);
 }
 
@@ -149,7 +175,7 @@ const latestStatement = (caseId: string): Statement | null => {
  * 새로고침해도 남아야 해서 브라우저에 적어 둔다. 목에는 토큰이 없고 누구인지만 적으므로
  * "액세스 토큰은 메모리에만" 규칙과 부딪히지 않는다 — http 구현은 지금도 메모리다.
  */
-const SESSION_KEY = 'cardefender.mock.session';
+const SESSION_KEY = 'fairway.mock.session';
 
 const readSession = (): Session | null => {
   try {
@@ -253,7 +279,21 @@ export const mockService: CaseService = {
     delete jobs[caseId];
   },
 
-  listMessages: async (caseId) => [...(logs[caseId] ?? [])],
+  /* 서버처럼 한 쪽씩 준다 (명세 C-1) — 대화가 길 때의 화면을 목에서도 볼 수 있게 */
+  listMessages: async (caseId, before) => {
+    const all = logs[caseId] ?? [];
+    const found = before ? all.findIndex((m) => m.id === before) : -1;
+    /* 커서를 못 찾으면 더 줄 것이 없다고 답한다 — 같은 쪽을 다시 주면 화면이
+       이미 들고 있는 카드를 또 받아 위로 올리기가 헛돈다 */
+    if (before && found < 0) return { items: [], hasMore: false, nextCursor: null };
+    const stop = found >= 0 ? found : all.length;
+    const start = Math.max(0, stop - MESSAGE_PAGE);
+    return {
+      items: all.slice(start, stop),
+      hasMore: start > 0,
+      nextCursor: start > 0 ? all[start].id : null,
+    };
+  },
 
   sendMessage: async (caseId, text) => {
     const c = find(caseId);
@@ -288,6 +328,38 @@ export const mockService: CaseService = {
       /* 영상이 먼저 와 있었다면 이 설명이 분석의 방아쇠가 된다 */
       if (c.video && c.stages.analysis === '대기') {
         await runAnalysis(caseId);
+        return;
+      }
+      /* 판정 뒤에 상대 보험사가 주장하는 비율("30:70이래요")을 말하면 판정 카드가
+         그 자리에서 갱신된다 — 서버는 같은 id의 카드를 message.updated로 다시 보낸다
+         (05 수정요청 9/6). 목도 같은 길을 태워 revise 경로가 시연에서 돈다 */
+      const claim = c.verdict ? text.match(/(\d{1,3})\s*(?::|대)\s*(\d{1,3})/) : null;
+      if (c.verdict && claim && Number(claim[1]) + Number(claim[2]) === 100) {
+        const mine = Number(claim[1]);
+        const diff = mine - c.verdict.ratio.mine;
+        const updated: Verdict = {
+          ...c.verdict,
+          opponentClaim: { mine, opponent: Number(claim[2]) },
+          opponentClaimNote:
+            diff > 0
+              ? `상대 보험사 주장보다 내 과실이 ${diff}%p 낮게 나왔어요`
+              : diff < 0
+                ? `상대 보험사 주장보다 내 과실이 ${-diff}%p 높게 나왔어요`
+                : '상대 보험사 주장과 같은 비율이에요',
+        };
+        c.verdict = updated;
+        const log = logs[caseId] ?? [];
+        const at = log.findLastIndex((msg) => msg.kind === 'verdict');
+        if (at !== -1) {
+          const card = { ...log[at], verdict: updated } as ChatMessage;
+          log[at] = card;
+          emit(caseId, (on) => on.messageUpdated?.(card));
+        }
+        push(caseId, {
+          role: 'ai',
+          kind: 'text',
+          text: '상대 보험사 주장을 판정 카드에 나란히 담았어요. 카드에서 견줘 보세요.',
+        });
         return;
       }
       /* **어느 갈래에도 걸리지 않으면 반드시 한 마디는 한다.**
@@ -396,7 +468,7 @@ export const mockService: CaseService = {
     void (async () => {
       await wait(900);
       if (!find(caseId)) return;
-      const doc = { ...DEMO_STATEMENT, updatedAt: now() };
+      const doc = { ...DEMO_STATEMENT, dateLabel: dateLabel() };
       c.stages = { ...c.stages, statement: '완료' };
       push(caseId, { role: 'ai', kind: 'statementDraft', doc });
       setJob(caseId, null);
@@ -413,7 +485,7 @@ export const mockService: CaseService = {
       push(caseId, {
         role: 'ai',
         kind: 'statementDraft',
-        doc: { ...before, version: before.version + 1, updatedAt: now() },
+        doc: { ...before, version: before.version + 1, dateLabel: dateLabel() },
       });
       setJob(caseId, null);
     })();
@@ -450,6 +522,12 @@ export const mockService: CaseService = {
     const before =
       found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL, sentAt: null };
     const next = { ...before, ...patch };
+    /* 서버는 접수번호가 바뀌면 제목을 다시 만든다 (명세 G-2 `subjectAuto`).
+       목이 그대로 두면 접수번호를 지웠는데 제목에는 옛 번호가 남아 카드가 어긋난다.
+       손으로 고친 제목은 건드리지 않는다 — 서버가 subjectAuto를 false로 내리는 것과 같다 */
+    if (patch.subject === undefined && isAutoSubject(before.subject)) {
+      next.subject = autoSubject(next.claimNo);
+    }
     if (found && found.kind === 'rebuttalDraft') found.doc = next;
     return next;
   },
@@ -483,9 +561,6 @@ export const mockService: CaseService = {
     };
   },
 };
-
-/** 시연·리허설용. 목에만 있다 */
-export const resetDemo = () => loadDemo();
 
 /**
  * 영상 길이는 브라우저에게 물어본다. 못 읽으면 0을 준다 —

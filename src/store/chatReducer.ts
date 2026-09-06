@@ -25,7 +25,10 @@ export type ChatAction =
   | { type: 'revise'; message: ChatMessage }
   /** 화면이 잠깐 세워 둔 카드를 치운다 (업로드 중·분석 중).
    *  서버가 만든 진짜 카드가 도착하면 그 자리를 내준다 — 로그에 남는 카드는 지우지 않는다 */
-  | { type: 'drop'; id: string };
+  | { type: 'drop'; id: string }
+  /** 더 오래된 쪽을 **앞에** 붙인다 (위로 올려서 보기 · 명세 C-1).
+   *  "추가만" 원칙과 어긋나지 않는다 — 지난 대화를 늦게 읽어 왔을 뿐이다 */
+  | { type: 'prepend'; messages: ChatMessage[] };
 
 export const emptyChat: ChatState = { messages: [] };
 
@@ -33,6 +36,13 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
   switch (action.type) {
     case 'reset':
       return { messages: action.messages };
+
+    case 'prepend': {
+      /* 이미 들고 있는 카드는 거른다 — 커서가 겹치거나 같은 쪽을 두 번 읽어도 안전하게 */
+      const have = new Set(state.messages.map((m) => m.id));
+      const older = action.messages.filter((m) => !have.has(m.id));
+      return older.length ? { messages: [...older, ...state.messages] } : state;
+    }
 
     case 'append':
       /* 같은 카드가 두 번 오는 일(내가 방금 붙인 글이 이벤트로 되돌아오는 등)은 여기서 막는다.

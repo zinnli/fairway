@@ -8,6 +8,7 @@ import { StageIcon } from '@/components/ui/StageIcon';
 import { Disclaimer } from '@/components/ui/Disclaimer';
 import { Dialog } from '@/components/ui/Dialog';
 import { Icon, type IconName } from '@/components/ui/Icon';
+import { BrandMark } from '@/components/ui/BrandMark';
 import { STAGE_LABELS, type CaseStatus, type StageState } from '@/domain/case';
 
 const ICONS: IconName[] = [
@@ -47,6 +48,19 @@ export function DesignSystemPage() {
           11_DesignSystem.html을 옆에 띄워 두고 비교하세요. 어긋나면 컴포넌트가 아니라 토큰을 고칩니다.
         </p>
       </header>
+
+      <Section
+        title="0. 로고"
+        note="완성 로고 한 장(public/logo.svg). 높이 16px — 로고 속 글자가 약 15px로 앉아 예전 이름표와 같은 크기가 됩니다."
+      >
+        <div className="flex items-center gap-4">
+          <span className="w-30 shrink-0 text-[12.5px] font-medium text-muted">머리글 로고</span>
+          {/* 높이 56은 사이드바 머리와 같다 — 실제 자리에서 어떻게 앉는지 함께 본다 */}
+          <span className="flex h-14 items-center border-l border-line pl-4">
+            <BrandMark />
+          </span>
+        </div>
+      </Section>
 
       <Section title="1. 색 토큰" note="정보 글자는 muted까지. disabled(#98A2B3)는 잠금 전용입니다.">
         <div className="flex flex-wrap gap-2">

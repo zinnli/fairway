@@ -94,6 +94,10 @@ export function StatusPanel({
   item,
   statement,
   rebuttal,
+  statementBusy,
+  rebuttalBusy,
+  statementExists,
+  rebuttalExists,
   showDisclaimer,
   onOpenStatement,
   onOpenRebuttal,
@@ -102,6 +106,14 @@ export function StatusPanel({
   /** 지금까지 만들어진 서류. 없으면 "만들기"가 되고, 만들 수도 없으면 잠긴다 */
   statement: Statement | null;
   rebuttal: Rebuttal | null;
+  /** 그 서류를 만드는 Job이 도는 중 — 줄을 "작성 중"(명세 G-1 label)으로 잠근다.
+      안 잠그면 몇 초 뒤 재클릭이 409를 맞고, 멀쩡히 돌던 Job의 로딩 카드가 내려간다 */
+  statementBusy?: boolean;
+  rebuttalBusy?: boolean;
+  /** 서류가 있는가. 대화 창(30장) 밖으로 밀려나 초안 카드가 없을 때도 참일 수 있다 —
+      그때는 줄을 "만들기"가 아니라 "열기"로 둔다. 누르면 열면서 받아 온다 */
+  statementExists?: boolean;
+  rebuttalExists?: boolean;
   /** 참고용 고지는 화면당 한 번만(규칙 0.2). 대화 카드가 이미 달고 있으면 여기선 뺀다 */
   showDisclaimer: boolean;
   onOpenStatement: () => void;
@@ -120,9 +132,13 @@ export function StatusPanel({
             : versionLabel(statement.version),
         locked: false,
       }
-    : item.verdict
-      ? { value: '아직 없음 · 눌러서 만들기', locked: false }
-      : { value: '잠김 · 판정이 먼저예요', locked: true };
+    : statementBusy
+      ? { value: '작성 중', locked: true }
+      : statementExists
+        ? { value: '눌러서 전문 보기', locked: false }
+        : item.verdict
+          ? { value: '아직 없음 · 눌러서 만들기', locked: false }
+          : { value: '잠김 · 판정이 먼저예요', locked: true };
 
   /* 보낸 뒤에는 초안의 sentAt이 아니라 단계를 본다 — 초안은 보내기 전 모습 그대로다 (4.4) */
   const sent = item.stages.rebuttal === '완료';
@@ -130,9 +146,13 @@ export function StatusPanel({
     ? { value: '발송 완료', locked: false }
     : rebuttal
       ? { value: '보낼 수 있어요', locked: false }
-      : statement
-        ? { value: '이제 만들 수 있어요', locked: false }
-        : { value: '잠김 · 판정과 경위서가 먼저예요', locked: true };
+      : rebuttalBusy
+        ? { value: '작성 중', locked: true }
+        : rebuttalExists
+          ? { value: '눌러서 열기', locked: false }
+          : statementExists
+            ? { value: '이제 만들 수 있어요', locked: false }
+          : { value: '잠김 · 판정과 경위서가 먼저예요', locked: true };
 
   return (
     <div className="flex h-full w-full shrink-0 flex-col overflow-hidden border-line bg-bg sm:w-85 sm:border-l">

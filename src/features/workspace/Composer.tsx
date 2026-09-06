@@ -8,6 +8,10 @@ import { cn } from '@/lib/cn';
  * 파일 선택창 자체는 작업 화면이 들고 있다 — h12의 [영상 올리기] 버튼도 같은 창을 열어야 한다.
  *
  * 여러 줄 입력은 textarea가 스스로 자라게 두지 않는다 — 자라면 대화 열이 밀린다.
+ *
+ * **분석·판정이 도는 동안은 통째로 잠근다** (명세 §5 activeJob). 시안에는 잠긴 모습이
+ * 그려져 있지 않아서 — h16도 평상시 알약이다 — 잠금은 규칙대로 **색 교체**로 보인다.
+ * 그림자도 걷는다: 떠 있는 잠긴 칸은 눌러도 되는 것처럼 보인다.
  */
 export function Composer({
   onSend,
@@ -34,7 +38,12 @@ export function Composer({
       <form
         /* 초점은 안쪽 입력칸이 아니라 **알약 전체**에 준다 (00 문서 3-1 입력칸 규칙).
            테두리 없는 투명 input에 3px 링을 그리면 둥근 알약 안에 네모 링이 뜬다 */
-        className="flex h-13 min-w-0 flex-1 items-center gap-2 rounded-full border border-line-2 bg-surface px-2 shadow-[0_4px_12px_rgba(17,20,26,0.06)] focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--color-brand-tint),0_4px_12px_rgba(17,20,26,0.06)]"
+        className={cn(
+          'flex h-13 min-w-0 flex-1 items-center gap-2 rounded-full border px-2',
+          disabled
+            ? 'border-line bg-bg-2'
+            : 'border-line-2 bg-surface shadow-[0_4px_12px_rgba(17,20,26,0.06)] focus-within:border-brand focus-within:shadow-[0_0_0_3px_var(--color-brand-tint),0_4px_12px_rgba(17,20,26,0.06)]',
+        )}
         onSubmit={(e) => {
           e.preventDefault();
           send();

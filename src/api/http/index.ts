@@ -3,11 +3,11 @@ import type {
   CaseDetail,
   CaseEvents,
   CaseService,
+  MessagePage,
   Session,
   UploadResult,
 } from '../service';
 import type { Case, CaseSummary, VideoRef } from '@/domain/case';
-import type { ChatMessage } from '@/domain/message';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { Precedent, Verdict } from '@/domain/verdict';
 
@@ -19,6 +19,7 @@ import * as verdictApi from './endpoints/verdict';
 import * as reportApi from './endpoints/report';
 import * as rebuttalApi from './endpoints/rebuttal';
 import { API_ORIGIN, downloadFile } from './client';
+import { isApiError } from './error';
 import { setToken } from './tokens';
 import { subscribeCase } from './sse';
 import type { CaseDto, JobDto, SessionDto } from './dto';
@@ -85,6 +86,9 @@ function saveAs(blob: Blob, filename: string) {
   setTimeout(() => URL.revokeObjectURL(url), 60_000);
 }
 
+/** 한 쪽에 몇 장인가 (명세 C-1 기본값은 20). 목과 같은 값을 쓴다 */
+const MESSAGE_PAGE = 30;
+
 export const httpService: CaseService = {
   /* ── 인증 ─────────────────────────────────────────────── */
 
@@ -102,12 +106,25 @@ export const httpService: CaseService = {
    * refresh 쿠키로 한 번 되살려 보고, 안 되면 로그인 화면으로 보낸다.
    */
   restoreSession: async () => {
-    try {
+    const attempt = async (): Promise<Session> => {
       const { accessToken } = await authApi.refresh();
       setToken(accessToken);
       const user = await authApi.me();
       return { id: user.id, email: user.email, onboardedAt: user.onboardedAt, isDemo: user.isDemo };
-    } catch {
+    };
+    try {
+      return await attempt();
+    } catch (e) {
+      /* 401·403은 진짜 세션 없음이다. 연결 끊김·5xx는 부팅 순간의 출렁임일 수 있어
+         한 번만 다시 물어본다 — refresh 쿠키가 멀쩡한데 로그인 화면에 떨어지지 않게 */
+      if (!isApiError(e) || e.status >= 500) {
+        await new Promise((r) => setTimeout(r, 1000));
+        try {
+          return await attempt();
+        } catch {
+          /* 두 번 다 안 되면 포기하고 로그인으로 보낸다 */
+        }
+      }
       setToken(null);
       return null;
     }
@@ -153,8 +170,21 @@ export const httpService: CaseService = {
 
   /* ── 대화 ─────────────────────────────────────────────── */
 
-  listMessages: async (caseId): Promise<ChatMessage[]> =>
-    toMessages((await messagesApi.list(caseId, { limit: 50 })).items),
+  /**
+   * 한 쪽만 읽는다 (명세 C-1). 대화가 길면 위로 올려서 더 받는다 —
+   * 한 번에 다 받으려 들면 오래된 사건일수록 첫 화면이 늦어진다.
+   *
+   * 카드 수는 서버가 준 것과 다를 수 있다 — 화면이 모르는 종류는 걸러지고
+   * `sent` 한 장은 두 장이 된다(expandMessage). 그래서 커서는 서버 것을 그대로 쓴다.
+   */
+  listMessages: async (caseId, before): Promise<MessagePage> => {
+    const page = await messagesApi.list(caseId, { before, limit: MESSAGE_PAGE });
+    return {
+      items: toMessages(page.items),
+      hasMore: page.hasMore,
+      nextCursor: page.nextCursor,
+    };
+  },
 
   sendMessage: async (caseId, text) => {
     const { message } = await messagesApi.send(caseId, text);
@@ -271,6 +301,7 @@ export const httpService: CaseService = {
       },
       caseUpdated: (c) => on.caseUpdated?.(caseWithRatio(c), toActiveJob(c.activeJob)),
       rebuttalSent: (d) => on.rebuttalSent?.(d.sentAt, d.recipient),
+      regained: () => on.regained?.(),
       lost: () => on.lost?.(),
     }),
 };

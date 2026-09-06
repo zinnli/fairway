@@ -270,15 +270,6 @@ export interface PrecedentDto {
 
 /* ── 사건경위서 ───────────────────────────────────────────────────────── */
 
-export interface ReportVersionDto {
-  version: number;
-  versionLabel: string;
-  pageCount: number;
-  revisionRequest: string | null;
-  hasPdf: boolean;
-  createdAt: string;
-}
-
 export interface ReportFullDto {
   reportId: string;
   version: number;
@@ -325,17 +316,6 @@ export interface SendResultDto {
   fromEmail: string;
   recipient: string;
   attachmentCount: number;
-}
-
-export interface SendLogDto {
-  sendLogId: string;
-  sentAt: string;
-  fromEmail: string;
-  recipient: string;
-  subject: string;
-  attachmentCount: number;
-  attachmentNames: string[];
-  result: 'sent' | 'delivered' | 'failed';
 }
 
 /* ── 공통 목록 봉투 ───────────────────────────────────────────────────── */

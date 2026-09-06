@@ -112,6 +112,15 @@ export function StatementDraftCard({
   );
 }
 
+/**
+ * 제목 끝의 괄호를 갈라 낸다 — "과실비율 재검토 요청 (접수번호는 아직 안 넣었어요)".
+ * 문구는 서버가 만든 것 그대로 두고, 색만 나눠 칠하려고 자른다.
+ */
+function splitTrailingParen(subject: string): [string, string | null] {
+  const m = /\s*(\([^()]*\))\s*$/.exec(subject.trim());
+  return m ? [subject.trim().slice(0, m.index), m[1]] : [subject.trim(), null];
+}
+
 /** 아직 못 채운 칸 — 모래빛 점 + 글자 (11_DesignSystem "확인 필요") */
 function Missing({ children }: { children: React.ReactNode }) {
   return (
@@ -165,6 +174,7 @@ export function RebuttalDraftCard({
   const attached = doc.attachments.filter((a) => a.included);
   /* 서버가 접수번호로 제목을 만든다(G-2 subjectAuto) — 아직 없으면 제목도 덜 된 것이다 */
   const claimNoNeeded = REQUIRE_CLAIM_NO && !claimNo;
+  const [subjectHead, subjectTail] = splitTrailingParen(doc.subject);
 
   return (
     <MessageCard>
@@ -187,10 +197,17 @@ export function RebuttalDraftCard({
         )}
       </FieldRow>
 
+      {/*
+        제목은 **서버가 접수번호로 만든다** (명세 G-2 `subjectAuto`).
+        접수번호가 없으면 서버 문장에 "(접수번호는 아직 안 넣었어요)"가 이미 들어 있다 —
+        화면이 덧붙이면 같은 말이 두 번 나온다. 괄호 끝을 갈라 모래빛으로 짚기만 한다 (시안 h28).
+      */}
       <FieldRow label="제목">
         <span className="text-ink">
-          {doc.subject}
-          {claimNoNeeded && <span className="text-sand-text"> (접수번호는 아직 안 넣었어요)</span>}
+          {subjectHead}
+          {subjectTail && (
+            <span className={claimNoNeeded ? 'text-sand-text' : undefined}> {subjectTail}</span>
+          )}
         </span>
       </FieldRow>
 

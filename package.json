@@ -1,10 +1,11 @@
 {
-  "name": "cardefender-fe",
+  "name": "fairway-fe",
   "private": true,
   "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:api": "DEV_API_MOCK=1 VITE_API=http VITE_API_BASE=/api/v1 vite",
     "build": "tsc -b && vite build",
     "typecheck": "tsc -b",
     "lint": "oxlint",

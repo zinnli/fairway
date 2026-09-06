@@ -164,7 +164,7 @@ export const DEMO_STATEMENT: Statement = {
   /* 위 네 절이 11pt·여백 18/16mm에서 한 장에 들어간다.
      명세 예시가 2로 적혀 있지만 그건 같은 본문에 붙은 자리표시자 값이다 */
   pageCount: 1,
-  updatedAt: '2026-08-25T10:10:00+09:00',
+  dateLabel: '08-25',
 };
 
 /** 반박의견서 — 보낸 뒤 상태 (h34 본문·첨부) */
@@ -267,7 +267,28 @@ const SEEDED: Case[] = [
   }),
 ];
 
-export const DEMO_CASES: Case[] = SEED ? SEEDED : [];
+/**
+ * 대화가 긴 사건 — **개발 서버에서만 붙는다** (`pnpm dev`).
+ * 대화가 길게 쌓였을 때의 화면과 한 쪽씩 읽어 오는 흐름(명세 C-1)을 확인하려고 둔다.
+ * 빌드에는 들어가지 않으므로 심사용 배포에는 보이지 않는다.
+ */
+const LONG_CHAT: Case[] = import.meta.env.DEV
+  ? [
+      seedCase({
+        id: 'case-long',
+        title: '대화가 긴 사건 · 개발용',
+        status: '판정 완료',
+        stages: { analysis: '완료', verdict: '완료', statement: '완료', rebuttal: '대기' },
+        video: DEMO_VIDEO,
+        verdict: DEMO_VERDICT,
+        facts: DEMO_FACTS,
+        createdAt: '2026-09-05T09:00:00+09:00',
+        updatedAt: '2026-09-05T10:10:00+09:00',
+      }),
+    ]
+  : [];
+
+export const DEMO_CASES: Case[] = [...(SEED ? SEEDED : []), ...LONG_CHAT];
 
 export const toSummary = (c: Case): CaseSummary => ({
   id: c.id,

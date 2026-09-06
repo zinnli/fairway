@@ -3,6 +3,7 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath, URL } from 'node:url';
 import { APP_NAME } from './src/config.ts';
+import { mockApi } from './dev/mockApi.ts';
 
 /** 서비스 이름이 미확정이라 index.html에 박지 않는다. %APP_NAME%을 빌드 시 치환한다. */
 const appName = (): Plugin => ({
@@ -29,10 +30,18 @@ const appName = (): Plugin => ({
  *   DEV_API_PROXY=https://…        ← 실제 API 주소 (저장소에 넣지 않는다)
  */
 export default defineConfig(({ mode }) => {
-  const target = loadEnv(mode, process.cwd(), '').DEV_API_PROXY;
+  const env = loadEnv(mode, process.cwd(), '');
+  /**
+   * 목 백엔드를 개발 서버 안에 붙인다 (`DEV_API_MOCK=1`).
+   * 브라우저 목(`VITE_API=mock`)과 달리 **진짜 HTTP로 답해서** 네트워크 탭에 찍힌다 —
+   * 전송 계층과 DTO 매핑을 함께 태워 보려는 것이라, 켜면 `VITE_API=http`로 둔다.
+   * 진짜 서버 중계(DEV_API_PROXY)와 겹치면 목이 이긴다.
+   */
+  const useMockApi = env.DEV_API_MOCK === '1';
+  const target = useMockApi ? undefined : env.DEV_API_PROXY;
 
   return {
-    plugins: [react(), tailwindcss(), appName()],
+    plugins: [react(), tailwindcss(), appName(), ...(useMockApi ? [mockApi()] : [])],
     resolve: {
       alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
     },

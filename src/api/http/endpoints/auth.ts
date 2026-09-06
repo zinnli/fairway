@@ -53,13 +53,7 @@ export const confirmPasswordReset = (input: {
     anonymous: true,
   });
 
-/**
- * A-9 체험 계정. **지금은 부르지 않는다** — 9/5에 로그인 필수로 정했다.
- * 서버가 A-9를 열고 방침이 바뀌면 이 줄을 쓰면 된다.
- */
-export const demoLogin = () =>
-  request<SessionDto>('/auth/demo', { method: 'POST', anonymous: true });
-
+/** A-10 온보딩 완료 표시 */
 export const completeOnboarding = (input: { completed: boolean; skipped: boolean }) =>
   request<{ onboardedAt: string }>('/users/me/onboarding', { method: 'PATCH', json: input });
 

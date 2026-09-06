@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useEffect, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router';
 import { IS_MOCK } from '@/api';
 import { useSessionStore } from '@/store/sessionStore';
@@ -20,6 +20,13 @@ export function RequireSession({ children }: { children: ReactNode }) {
   const status = useSessionStore((s) => s.status);
   const exit = useSessionStore((s) => s.exit);
   const { pathname, search } = useLocation();
+
+  /* 첫 화면으로 한 번 내보냈으면 exit의 몫은 끝났다 — 도로 '/login'으로 돌린다.
+     그대로 두면 이후의 /cases 시도가 전부 첫 화면으로 되튀어, 로그아웃한 사람에게
+     "사고 접수 시작"이 아무 반응 없는 단추가 된다 (새로고침해야 풀렸다) */
+  useEffect(() => {
+    if (status === 'out' && exit === '/') useSessionStore.setState({ exit: '/login' });
+  }, [status, exit]);
 
   if (IS_MOCK) return <>{children}</>;
   if (status === 'checking') return null;

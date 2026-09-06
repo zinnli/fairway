@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/Button';
+import { cn } from '@/lib/cn';
 import { Dialog } from '@/components/ui/Dialog';
 import { Field } from '@/components/ui/Field';
 import { Icon } from '@/components/ui/Icon';
@@ -131,35 +132,57 @@ export function RebuttalDialog({
       }
     >
       <div className="flex flex-col gap-5">
-        <Field
-          label="받는이 (필수)"
-          type="email"
-          autoComplete="email"
-          value={to}
-          onChange={(e) => setTo(e.target.value)}
-          onBlur={() => setTouched(true)}
-          error={toError}
-        />
+        {/* 보낸 문서는 고칠 수 없다(기능명세 4.4 · 명세 G-2 editable:false) — 입력칸 대신
+            보낸 값을 제목 칸과 같은 꼴로 보여 준다. 값은 읽어야 하므로 disabled 색이 아니다 */}
+        {alreadySent ? (
+          <div className="flex flex-col gap-1">
+            <p className="text-[12.5px] font-medium text-muted">받는이</p>
+            <p className="box-border flex min-h-11 items-center rounded-md border border-line bg-bg-2 px-4 text-[15px] text-ink-3">
+              {to}
+            </p>
+          </div>
+        ) : (
+          <Field
+            label="받는이 (필수)"
+            type="email"
+            autoComplete="email"
+            value={to}
+            onChange={(e) => setTo(e.target.value)}
+            onBlur={() => setTouched(true)}
+            error={toError}
+          />
+        )}
 
         <div className="flex flex-col gap-1">
-          <Field
-            label="접수번호 (필수)"
-            value={claimNo}
-            onChange={(e) => setClaimNo(e.target.value)}
-            onBlur={() => setTouched(true)}
-            error={claimError}
-          />
-          {!claimError && (
-            <p className="text-[12.5px] text-muted">보험사 접수 문자나 메일에 있어요</p>
+          {alreadySent ? (
+            <>
+              <p className="text-[12.5px] font-medium text-muted">접수번호</p>
+              <p className="box-border flex min-h-11 items-center rounded-md border border-line bg-bg-2 px-4 text-[15px] text-ink-3">
+                {doc?.claimNo ?? claimNo}
+              </p>
+            </>
+          ) : (
+            <>
+              <Field
+                label="접수번호 (필수)"
+                value={claimNo}
+                onChange={(e) => setClaimNo(e.target.value)}
+                onBlur={() => setTouched(true)}
+                error={claimError}
+              />
+              {!claimError && (
+                <p className="text-[12.5px] text-muted">보험사 접수 문자나 메일에 있어요</p>
+              )}
+            </>
           )}
         </div>
 
         <div className="flex flex-col gap-1">
           <p className="text-[12.5px] font-medium text-muted">
-            제목 (접수번호를 넣어 자동으로 만들어요)
+            {alreadySent ? '제목' : '제목 (접수번호를 넣어 자동으로 만들어요)'}
           </p>
           <p className="box-border flex min-h-11 items-center rounded-md border border-line bg-bg-2 px-4 text-[15px] text-ink-3">
-            {subjectOf(claimNo)}
+            {alreadySent ? (doc?.subject ?? subjectOf(claimNo)) : subjectOf(claimNo)}
           </p>
         </div>
 
@@ -177,7 +200,13 @@ export function RebuttalDialog({
             value={body}
             onChange={(e) => setBody(e.target.value)}
             rows={16}
-            className="box-border resize-y rounded-md border border-line bg-surface px-4 py-3 text-[15px] leading-[1.6] text-ink focus-visible:border-brand"
+            readOnly={alreadySent}
+            className={cn(
+              'box-border rounded-md border border-line px-4 py-3 text-[15px] leading-[1.6]',
+              alreadySent
+                ? 'resize-none bg-bg-2 text-ink-3'
+                : 'resize-y bg-surface text-ink focus-visible:border-brand',
+            )}
           />
         </div>
 
@@ -185,22 +214,29 @@ export function RebuttalDialog({
           <p className="text-[12.5px] font-medium text-muted">첨부</p>
           <div className="flex flex-wrap gap-2">
             {attachments.length === 0 ? (
-              <p className="text-[13.5px] text-muted">첨부 없이 보냅니다.</p>
+              <p className="text-[13.5px] text-muted">
+                {alreadySent ? '첨부 없이 보냈어요.' : '첨부 없이 보냅니다.'}
+              </p>
             ) : (
               attachments.map((a) => (
                 <span
                   key={a.id}
-                  className="box-border inline-flex items-center gap-1 rounded-full border border-line bg-surface py-1 pr-1 pl-3 text-[12.5px] font-medium text-ink-2"
+                  className={cn(
+                    'box-border inline-flex items-center gap-1 rounded-full border border-line bg-surface py-1 text-[12.5px] font-medium text-ink-2',
+                    alreadySent ? 'px-3' : 'pr-1 pl-3',
+                  )}
                 >
                   {a.label}
-                  <button
-                    type="button"
-                    aria-label={`${a.label} 빼기`}
-                    onClick={() => setDropped((d) => [...d, a.id])}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-bg-2"
-                  >
-                    <Icon name="close" size={12} />
-                  </button>
+                  {!alreadySent && (
+                    <button
+                      type="button"
+                      aria-label={`${a.label} 빼기`}
+                      onClick={() => setDropped((d) => [...d, a.id])}
+                      className="flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-bg-2"
+                    >
+                      <Icon name="close" size={12} />
+                    </button>
+                  )}
                 </span>
               ))
             )}
@@ -210,10 +246,12 @@ export function RebuttalDialog({
               {a.label} — {a.note}
             </p>
           ))}
-          <p className="text-[12.5px] leading-[1.5] text-muted">
-            영상에는 상대 차량 번호판 등 다른 사람의 정보가 담길 수 있어요. 보험사 담당자에게만 보내
-            주세요. ×를 누르면 빼고 보낼 수 있어요.
-          </p>
+          {!alreadySent && (
+            <p className="text-[12.5px] leading-[1.5] text-muted">
+              영상에는 상대 차량 번호판 등 다른 사람의 정보가 담길 수 있어요. 보험사 담당자에게만
+              보내 주세요. ×를 누르면 빼고 보낼 수 있어요.
+            </p>
+          )}
         </div>
       </div>
     </Dialog>

@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/Button';
 import { ConfirmDialog } from '@/components/ui/ConfirmDialog';
 import { Icon } from '@/components/ui/Icon';
 import { cn } from '@/lib/cn';
+import { isApiError } from '@/api';
 import { useCaseStore } from '@/store/caseStore';
 import { useSessionStore } from '@/store/sessionStore';
 import { CaseRow } from './CaseRow';
@@ -27,6 +28,25 @@ export function Sidebar({
   const { list, loaded, load, create, rename, remove } = useCaseStore();
   const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [creating, setCreating] = useState(false);
+  /* 만들기·이름 바꾸기·삭제가 실패하면 침묵하지 않고 한 줄로 알린다 */
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  const newCase = async () => {
+    if (creating) return;
+    setCreating(true);
+    setActionError(null);
+    try {
+      navigate(`/cases/${await create()}`);
+    } catch (e) {
+      /* 서버가 완성 문장을 줬으면 그대로 쓴다(명세 §2.3). 규격 밖 실패에만 우리 문장 */
+      setActionError(
+        isApiError(e) ? e.body.message : '사건을 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
   const signOut = useSessionStore((s) => s.signOut);
   /* 사이드바 아래에 지금 들어와 있는 사람을 보여 준다 */
   const user = useSessionStore((s) => s.user);
@@ -47,10 +67,14 @@ export function Sidebar({
         <Button
           variant="secondary"
           className="w-full"
-          onClick={async () => navigate(`/cases/${await create()}`)}
+          onClick={() => void newCase()}
+          disabled={creating}
         >
           <Icon name="plus" size={15} strokeWidth={2} />새 사건
         </Button>
+        {actionError && (
+          <p className="pt-2 text-[12.5px] leading-[1.5] font-medium text-danger">{actionError}</p>
+        )}
       </div>
 
       <p className="mb-2 flex-none px-4 text-[12px] font-semibold tracking-[0.6px] text-muted">
@@ -69,7 +93,15 @@ export function Sidebar({
               key={item.id}
               item={item}
               selected={item.id === selectedId}
-              onRename={(title) => void rename(item.id, title)}
+              onRename={(title) =>
+                void rename(item.id, title).catch((e: unknown) =>
+                  setActionError(
+                    isApiError(e)
+                      ? e.body.message
+                      : '이름을 바꾸지 못했어요. 잠시 후 다시 시도해 주세요.',
+                  ),
+                )
+              }
               onDelete={() => setDeleteTarget(item.id)}
             />
           ))}
@@ -100,9 +132,21 @@ export function Sidebar({
         open={deleting !== undefined}
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => {
-          if (deleteTarget) void remove(deleteTarget);
+          const id = deleteTarget;
           setDeleteTarget(null);
-          if (deleteTarget === selectedId) navigate('/cases');
+          if (!id) return;
+          setActionError(null);
+          /* 지워진 것을 확인한 뒤에 옮긴다 — 실패했는데 목록으로 가 버리면
+             사건이 왜 그대로 있는지 알 길이 없다 */
+          void remove(id)
+            .then(() => {
+              if (id === selectedId) navigate('/cases');
+            })
+            .catch((e: unknown) =>
+              setActionError(
+                isApiError(e) ? e.body.message : '사건을 지우지 못했어요. 잠시 후 다시 시도해 주세요.',
+              ),
+            );
         }}
         title="사건을 삭제할까요?"
         description={`"${deleting?.title ?? '새 사건'}"의 영상과 대화, 서류가 함께 지워지고 되돌릴 수 없어요.`}
