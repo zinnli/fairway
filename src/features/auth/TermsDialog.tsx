@@ -22,6 +22,110 @@ function RequiredBadge() {
 }
 
 /**
+ * 서버 전문은 **마크다운이다** (A-11 `bodyMarkdown`). 그대로 문단으로 뿌리면
+ * 화면에 `## 1. 목적`이 글자 그대로 보인다.
+ *
+ * 라이브러리를 들이지 않는다 — 실제로 오는 것은 `## 제목`과 문단 두 가지뿐이고
+ * (약관·개인정보·영상동의 3종 모두 같은 모양), 목록·굵게까지만 곁들이면 남는 것이 없다.
+ * 아는 표시가 아니면 글자 그대로 두어, 못 그리는 문서라도 내용은 다 읽히게 한다.
+ */
+type Block =
+  | { kind: 'heading'; text: string }
+  | { kind: 'para'; text: string }
+  | { kind: 'list'; items: string[] };
+
+function parseMarkdown(md: string): Block[] {
+  const blocks: Block[] = [];
+  let para: string[] = [];
+  let list: string[] = [];
+  const flushPara = () => {
+    if (para.length) blocks.push({ kind: 'para', text: para.join(' ') });
+    para = [];
+  };
+  const flushList = () => {
+    if (list.length) blocks.push({ kind: 'list', items: list });
+    list = [];
+  };
+
+  for (const raw of md.split('\n')) {
+    const line = raw.trim();
+    if (!line) {
+      flushPara();
+      flushList();
+      continue;
+    }
+    const heading = /^#{1,4}\s+(.+)$/.exec(line);
+    if (heading) {
+      flushPara();
+      flushList();
+      blocks.push({ kind: 'heading', text: heading[1] });
+      continue;
+    }
+    const item = /^[-*]\s+(.+)$/.exec(line);
+    if (item) {
+      flushPara();
+      list.push(item[1]);
+      continue;
+    }
+    flushList();
+    /* 이어지는 줄은 한 문단으로 잇는다 — 마크다운에서 줄바꿈 하나는 줄을 바꾸지 않는다 */
+    para.push(line);
+  }
+  flushPara();
+  flushList();
+  return blocks;
+}
+
+/** `**굵게**`만 살린다. 나머지 기호는 글자 그대로 둔다 */
+function inline(text: string) {
+  return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
+    part.startsWith('**') && part.endsWith('**') && part.length > 4 ? (
+      <b key={i} className="font-semibold">
+        {part.slice(2, -2)}
+      </b>
+    ) : (
+      part
+    ),
+  );
+}
+
+/**
+ * 제목은 굵은 한 줄로 둔다 — 시안 h40의 영상 동의 전문이 그 모양이라(굵은 소제목 + 문단),
+ * 서버 글도 같은 자리에서 같게 읽히게 한다. 글자 크기를 새로 만들지 않는다.
+ */
+function Markdown({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col gap-2">
+      {parseMarkdown(text).map((block, i) => {
+        if (block.kind === 'heading') {
+          return (
+            <p key={i} className="mt-2 text-[15px] leading-[1.8] font-semibold text-ink first:mt-0">
+              {inline(block.text)}
+            </p>
+          );
+        }
+        if (block.kind === 'list') {
+          return (
+            <ul key={i} className="flex list-disc flex-col gap-1 pl-5">
+              {block.items.map((item, j) => (
+                <li key={j} className="text-[15px] leading-[1.8] text-ink">
+                  {inline(item)}
+                </li>
+              ))}
+            </ul>
+          );
+        }
+        return (
+          <p key={i} className="text-[15px] leading-[1.8] text-ink">
+            {inline(block.text)}
+          </p>
+        );
+      })}
+    </div>
+  );
+}
+
+/**
  * P-6 약관·개인정보 팝업 — h40.
  * 동의 3종이 이 부품 하나를 돌려쓴다. 읽기 전용이고, 동의는 가입 화면의 체크박스가 맡는다.
  *
@@ -69,14 +173,8 @@ export function TermsDialog({ term, onClose }: { term: TermKey | null; onClose: 
             <b className="font-semibold">쉽게 말하면</b> — {doc.summary}
           </p>
         )}
-        {/* 서버 전문이 있으면 그것이 정본이다 */}
-        {remote
-          ? remote.split('\n\n').map((para) => (
-              <p key={para.slice(0, 24)} className="text-[15px] leading-[1.8] whitespace-pre-line text-ink">
-                {para}
-              </p>
-            ))
-          : null}
+        {/* 서버 전문이 있으면 그것이 정본이다 — 마크다운으로 온다 (A-11) */}
+        {remote && <Markdown text={remote} />}
         {!remote &&
           doc?.sections.map((section) => (
             <p key={section.heading} className="text-[15px] leading-[1.8] text-ink">

@@ -52,12 +52,37 @@ export default defineConfig(({ mode }) => {
               target,
               changeOrigin: true,
               /* SSE는 흘려 보내야 한다 — 모아 뒀다 한 번에 주면 카드가 늦게 뜬다 */
-              configure: (proxy) =>
+              configure: (proxy) => {
+                /* 목 백엔드(dev:api)를 쓰던 브라우저에 남은 refresh_token=devmock-refresh 가
+                   실서버 요청에 같이 실리면, 서버가 같은 이름의 뒤 값을 읽어 진짜 토큰을
+                   덮는다 — 새로고침마다 로그인이 풀렸다. 나가는 길에 찌꺼기를 걷어 낸다 */
+                proxy.on('proxyReq', (proxyReq) => {
+                  const cookie = proxyReq.getHeader('cookie');
+                  if (typeof cookie === 'string' && cookie.includes('devmock')) {
+                    const kept = cookie
+                      .split(/;\s*/)
+                      .filter((c) => !c.startsWith('refresh_token=devmock') && !c.startsWith('devmock_refresh='))
+                      .join('; ');
+                    if (kept) proxyReq.setHeader('cookie', kept);
+                    else proxyReq.removeHeader('cookie');
+                  }
+                });
                 proxy.on('proxyRes', (res) => {
                   if (res.headers['content-type']?.includes('text/event-stream')) {
                     delete res.headers['content-length'];
                   }
-                }),
+                  /* 서버 refresh 쿠키에 Secure가 붙어 온다. 개발 서버는 http라
+                     Safari가 저장을 거부해 **새로고침마다 로그인이 풀린다**
+                     (크롬·파이어폭스는 localhost를 예외로 봐서 멀쩡하다).
+                     로컬 중계에서만 그 속성을 벗긴다 — 배포에는 프록시가 없다 */
+                  const cookies = res.headers['set-cookie'];
+                  if (cookies) {
+                    res.headers['set-cookie'] = cookies.map((c) =>
+                      c.replace(/;\s*Secure/i, ''),
+                    );
+                  }
+                });
+              },
             },
           },
         }

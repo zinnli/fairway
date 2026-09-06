@@ -14,12 +14,6 @@ export type SessionStatus = 'checking' | 'in' | 'out';
 interface SessionState {
   status: SessionStatus;
   user: Session | null;
-  /**
-   * 세션이 없을 때 어디로 보낼지. 나가는 방식이 다르면 가는 곳도 다르다 —
-   * 내가 눌러서 나갔으면 첫 화면(F05), 쓰다가 풀렸으면 로그인 화면.
-   * 길을 옮기는 쪽과 세션을 내리는 쪽이 경쟁하지 않도록 가드 한 곳에서만 정한다.
-   */
-  exit: '/' | '/login';
   /** 앱이 뜰 때 한 번. 두 번 불러도 한 번만 돈다 */
   boot: () => Promise<void>;
   signIn: (user: Session) => void;
@@ -33,26 +27,23 @@ let booted = false;
 export const useSessionStore = create<SessionState>((set) => ({
   status: 'checking',
   user: null,
-  exit: '/login',
 
   boot: async () => {
     if (booted) return;
     booted = true;
 
     const restored = await service.restoreSession();
-    set(
-      restored
-        ? { status: 'in', user: restored }
-        : { status: 'out', user: null, exit: '/login' },
-    );
+    set(restored ? { status: 'in', user: restored } : { status: 'out', user: null });
   },
 
-  signIn: (user) => set({ status: 'in', user, exit: '/login' }),
+  signIn: (user) => set({ status: 'in', user }),
 
   signOut: async () => {
-    /* 먼저 내리고 나서 서버에 알린다 — 화면은 기다릴 이유가 없다 */
+    /* 먼저 내리고 나서 서버에 알린다 — 화면은 기다릴 이유가 없다.
+       **첫 화면으로 옮기는 일은 부르는 쪽이 이미 했다** (Sidebar). 여기서 길을 정하면
+       가드와 둘이 같은 것을 정하게 되어, 누가 먼저 도느냐에 따라 목적지가 달라진다 */
     booted = true;
-    set({ status: 'out', user: null, exit: '/' });
+    set({ status: 'out', user: null });
     /* 사건 목록은 사람에 딸린 것이다. 남겨 두면 loaded가 true라 다시 읽지도 않아서
        다음에 로그인한 사람에게 이전 사람의 사건 제목이 그대로 보인다 */
     useCaseStore.getState().reset();
@@ -60,7 +51,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   },
 
   expire: () => {
-    set({ status: 'out', user: null, exit: '/login' });
+    set({ status: 'out', user: null });
     useCaseStore.getState().reset();
   },
 }));

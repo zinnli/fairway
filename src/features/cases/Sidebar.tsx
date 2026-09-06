@@ -159,8 +159,11 @@ export function Sidebar({
         onClose={() => setLogoutOpen(false)}
         onConfirm={() => {
           setLogoutOpen(false);
-          /* 서버 세션과 쿠키까지 끊는다. 사건·영상·서류는 계정에 남는다 (명세 A-3).
-             길은 가드가 옮긴다 — 눌러서 나간 것이므로 첫 화면으로 간다 (F05) */
+          /* **먼저 나가고 나서 세션을 내린다.** 내가 눌러서 나간 것이므로 첫 화면이다 (F05).
+             순서가 뒤집히면 아직 사건 화면에 선 채로 세션이 없어져, 라우트 가드가
+             "세션이 풀렸다"고 보고 로그인 화면으로 옮겨 버린다.
+             서버 세션과 쿠키는 signOut이 끊는다. 사건·영상·서류는 계정에 남는다 (명세 A-3) */
+          navigate('/', { replace: true });
           void signOut();
         }}
         title="로그아웃할까요?"
