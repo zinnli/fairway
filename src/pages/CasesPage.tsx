@@ -1,8 +1,9 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
 import { Sidebar } from '@/features/cases/Sidebar';
-import { service } from '@/api';
+import { isApiError, service } from '@/api';
 import { OnboardingModal } from '@/features/onboarding/OnboardingModal';
 import { useCaseStore } from '@/store/caseStore';
 import { useSessionStore } from '@/store/sessionStore';
@@ -24,6 +25,25 @@ export function CasesPage() {
      들어올 때마다 다시 뜨지 않는다 — 세션 안 표시(onboardingSeen)만으로는 모자라다 */
   const onboardedAt = useSessionStore((s) => s.user?.onboardedAt ?? null);
   const empty = loaded && list.length === 0;
+  const [creating, setCreating] = useState(false);
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  /* 더블클릭이 사건을 두 개 만들지 않게 잠그고, 실패는 침묵하지 않는다.
+     서버가 완성 문장을 줬으면 그대로 쓴다(명세 §2.3) */
+  const newCase = async () => {
+    if (creating) return;
+    setCreating(true);
+    setCreateError(null);
+    try {
+      navigate(`/cases/${await create()}`);
+    } catch (e) {
+      setCreateError(
+        isApiError(e) ? e.body.message : '사건을 만들지 못했어요. 잠시 후 다시 시도해 주세요.',
+      );
+    } finally {
+      setCreating(false);
+    }
+  };
 
   return (
     <div className="flex h-dvh bg-bg-3">
@@ -55,9 +75,10 @@ export function CasesPage() {
             </>
           )}
         </p>
-        <Button size="lg" onClick={async () => navigate(`/cases/${await create()}`)}>
+        <Button size="lg" onClick={() => void newCase()} disabled={creating}>
           <Icon name="plus" size={16} strokeWidth={2} />새 사건 만들기
         </Button>
+        {createError && <p className="text-[12.5px] font-medium text-danger">{createError}</p>}
       </main>
 
       {/* 끝까지 봤든 건너뛰었든 서버에 남긴다 — 다음에 들어올 때 다시 뜨지 않게 (A-10) */}
