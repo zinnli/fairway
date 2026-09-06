@@ -1,4 +1,4 @@
-import type { Case, CaseSummary, VideoRef } from '@/domain/case';
+import type { Case, CaseSummary, Facts, VideoRef } from '@/domain/case';
 import { emptyStages } from '@/domain/case';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { Verdict } from '@/domain/verdict';
@@ -14,6 +14,25 @@ import type { Verdict } from '@/domain/verdict';
  * 인정기준 도표 번호는 미확정이라 chartNo는 전부 null이다.
  */
 
+/**
+ * 확인된 사실 — 시안 h21·h23의 칩 묶음. 서버가 영상 분석에서 뽑아 준다.
+ * 마지막 하나가 `pending`이라 "남은 1개는 쟁점이에요"가 된다.
+ * 제목 문장은 서버가 만들어 보내므로 목도 통째로 들고 있는다.
+ */
+export const DEMO_FACTS: Facts = {
+  confirmed: 5,
+  total: 6,
+  label: '확인된 사실 5 / 6 · 남은 1개는 쟁점이에요',
+  items: [
+    { label: '2차로 직진', source: 'video' },
+    { label: '상대 우측 진입', source: 'video' },
+    { label: '상대 적색 신호 (위반)', source: 'video' },
+    { label: '약 48km/h', source: 'video' },
+    { label: '우측 앞펜더', source: 'video' },
+    { label: '정지선 통과 확인 필요', source: 'pending' },
+  ],
+};
+
 function seedCase(over: Partial<Case> & Pick<Case, 'id' | 'title' | 'status'>): Case {
   return {
     stages: emptyStages(),
@@ -22,6 +41,8 @@ function seedCase(over: Partial<Case> & Pick<Case, 'id' | 'title' | 'status'>): 
     accidentAt: '2026-08-22T14:00:00+09:00',
     accidentPlace: '서울시 강남구 논현사거리',
     claimNo: null,
+    /* 영상 분석 전에는 null이다 — 분석이 끝난 사건만 아래에서 채운다 */
+    facts: null,
     createdAt: '2026-08-22T09:00:00+09:00',
     updatedAt: '2026-08-22T09:00:00+09:00',
     ...over,
@@ -62,14 +83,19 @@ export const DEMO_QUESTIONS = [
   '신호가 바뀔 때 정지선을 지나고 있었나요? 기억이 안 나면 그렇게 적어 주셔도 괜찮아요. 2/2',
 ];
 
-/** 판정 — 신호위반 일방과실 (h21). 일치도·쟁점은 9/3에 빠졌다 */
+/** 판정 — 신호위반 일방과실 (h21). 일치도·쟁점은 9/3에 뺀 채다 (상대 주장 비교만 9/6에 돌아왔다) */
 export const DEMO_VERDICT: Verdict = {
   ratio: { mine: 0, opponent: 100 },
   /* 시안 h23이 그려 둔 값. null로 두면 비교 막대가 사라지는 쪽을 볼 수 있다 */
   opponentClaim: { mine: 30, opponent: 70 },
+  opponentClaimNote: '상대 보험사 주장보다 내 과실이 30%p 낮게 나왔어요',
+  /*
+    서버는 번호를 이름 앞에 붙여 보낸다 — "266 · 차대차 회전교차로 사고" (9/6).
+    **목은 번호를 모른다.** 이 시연 사례(신호위반 교차로)에 붙을 번호를 아무도 정해 주지
+    않았으므로 지어내지 않고 이름만 둔다 — 시안 h21도 번호 없이 그려 뒀다.
+  */
   chartName: '신호기 있는 교차로 · 신호위반',
   chartNote: '사고 유형별 기본 비율을 정해 둔 표 · 차대이륜차 편',
-  chartNo: null,
   baseRatio: { mine: 0, opponent: 100 },
   adjustments: [],
   conclusion:
@@ -176,6 +202,7 @@ const SEEDED: Case[] = [
     stages: { analysis: '완료', verdict: '완료', statement: '대기', rebuttal: '대기' },
     video: DEMO_VIDEO,
     verdict: DEMO_VERDICT,
+    facts: DEMO_FACTS,
     updatedAt: '2026-09-02T09:24:00+09:00',
   }),
 
@@ -208,6 +235,7 @@ const SEEDED: Case[] = [
     status: '확인 필요',
     stages: { analysis: '완료', verdict: '대기', statement: '대기', rebuttal: '대기' },
     video: DEMO_VIDEO,
+    facts: DEMO_FACTS,
     createdAt: '2026-08-30T10:05:00+09:00',
     updatedAt: '2026-08-30T10:12:00+09:00',
   }),
@@ -220,6 +248,7 @@ const SEEDED: Case[] = [
     stages: { analysis: '완료', verdict: '완료', statement: '완료', rebuttal: '완료' },
     video: DEMO_VIDEO,
     verdict: DEMO_VERDICT,
+    facts: DEMO_FACTS,
     claimNo: '2026-08-0000',
     createdAt: '2026-08-28T09:00:00+09:00',
     updatedAt: '2026-08-28T16:40:00+09:00',

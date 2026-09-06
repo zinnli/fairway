@@ -469,12 +469,20 @@ export function CaseWorkspacePage() {
             if (message.role === 'ai') dropReplyCard();
             dispatch({ type: 'append', message });
           },
-          /* 다시 쓴 서류는 제자리에서 바꾸지 않고 대화 끝으로 옮긴다 —
-             저 위에서 조용히 바뀌면 다시 쓴 티가 안 난다 (명세 F-4는 message.updated로 온다) */
+          /*
+            다시 쓴 서류와 갱신된 판정은 제자리에서 바꾸지 않고 대화 끝으로 옮긴다 —
+            저 위에서 조용히 바뀌면 달라진 티가 안 난다.
+
+            판정도 갱신된다: 판정 뒤에 "상대 보험사가 30:70이래요"라고 말하면 서버가
+            같은 id의 카드를 `message.updated`로 다시 보낸다(비교 막대가 채워진다).
+            영상 메타 갱신처럼 자리를 지켜야 하는 것은 그대로 settle이다.
+          */
           messageUpdated: (message) =>
             dispatch({
               type:
-                message.kind === 'statementDraft' || message.kind === 'rebuttalDraft'
+                message.kind === 'statementDraft' ||
+                message.kind === 'rebuttalDraft' ||
+                message.kind === 'verdict'
                   ? 'revise'
                   : 'settle',
               message,

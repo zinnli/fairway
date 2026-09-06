@@ -1,4 +1,12 @@
-import type { Case, CaseStatus, CaseSummary, Stages, StageState, VideoRef } from '@/domain/case';
+import type {
+  Case,
+  CaseStatus,
+  CaseSummary,
+  Facts,
+  Stages,
+  StageState,
+  VideoRef,
+} from '@/domain/case';
 import type { ChatMessage } from '@/domain/message';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { Precedent, Ratio, Verdict } from '@/domain/verdict';
@@ -6,6 +14,7 @@ import type {
   CaseDto,
   CaseStatusDto,
   CaseSummaryDto,
+  FactsDto,
   MessageDto,
   RatioDto,
   RebuttalDto,
@@ -70,6 +79,20 @@ export const toCaseSummary = (c: CaseSummaryDto): CaseSummary => ({
   updatedAt: c.updatedAt,
 });
 
+/** 모르는 source가 오면 video로 본다 (서버가 나중에 늘릴 수 있다) */
+const toFacts = (f: FactsDto | null | undefined): Facts | null =>
+  f
+    ? {
+        confirmed: f.confirmed,
+        total: f.total,
+        label: f.label,
+        items: f.items.map((i) => ({
+          label: i.label,
+          source: i.source === 'pending' || i.source === 'user' ? i.source : 'video',
+        })),
+      }
+    : null;
+
 export function toCase(c: CaseDto, verdict: Verdict | null = null): Case {
   return {
     id: c.id,
@@ -91,6 +114,7 @@ export function toCase(c: CaseDto, verdict: Verdict | null = null): Case {
     accidentAt: null,
     accidentPlace: null,
     claimNo: null,
+    facts: toFacts(c.facts),
     createdAt: c.createdAt,
     updatedAt: c.updatedAt,
   };
@@ -121,11 +145,11 @@ export function toVerdict(v: VerdictPayloadDto): Verdict {
   return {
     ratio,
     opponentClaim: v.opponentClaim ? toRatio(v.opponentClaim) : null,
+    opponentClaimNote: v.opponentClaimNote ?? '',
     conclusion: v.summary,
+    /* 번호는 이름 앞머리에 실려 온다 — 따로 받는 칸을 두지 않는다 (9/6) */
     chartName: v.basis.chart.name,
     chartNote: v.basis.chart.note || null,
-    /* ★ 도표 번호는 여전히 미확정이다. 서버도 이름과 설명만 준다 */
-    chartNo: null,
     /* ★ 서버는 기본 비율·가감 항목을 주지 않는다. 화면에서 쓰는 곳이 없다 */
     baseRatio: ratio,
     adjustments: [],

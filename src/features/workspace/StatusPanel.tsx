@@ -2,7 +2,7 @@ import { Icon } from '@/components/ui/Icon';
 import { DISCLAIMER } from '@/config';
 import { RatioTrack } from '@/components/ui/RatioBar';
 import { StageIcon } from '@/components/ui/StageIcon';
-import { STAGE_LABELS, type Case } from '@/domain/case';
+import { STAGE_LABELS, type Case, type Fact } from '@/domain/case';
 import type { Rebuttal, Statement } from '@/domain/document';
 import { versionLabel } from '@/lib/document';
 import { formatRatio } from '@/domain/verdict';
@@ -13,11 +13,39 @@ import { cn } from '@/lib/cn';
  * 폭 340 고정. 1280 미만에서는 접히는데, 768 이상은 오른쪽 서랍이고 그 아래는
  * 아래에서 올라오는 시트다(m09). 껍데기는 작업 화면이 씌운다.
  *
- * 9/3 축소로 "확인된 사실"·"영상에서 찾은 사실" 묶음과 [변경 이력 보기]가 빠졌다
- * (04 문서 C2·C3). 남는 것은 예상 과실비율 · 진행 단계 · 서류 세 덩이다.
+ * "확인된 사실" 묶음은 9/3에 뺐다가 9/6에 되살렸다 — 다만 **보여 주기만 한다.**
+ * 고치기(h19·h23)와 [변경 이력 보기](04 문서 C3)는 뺀 채로 둔다.
+ * 덩이는 넷이다 — 예상 과실비율 · 진행 단계 · 확인된 사실 · 서류.
  */
 
-function SectionTitle({ icon, children }: { icon: 'clock' | 'file'; children: React.ReactNode }) {
+/** 사실 하나의 출처 — 점 색이 곧 범례다 (시안 h21 오른쪽 패널) */
+const SOURCE_DOT: Record<Fact['source'], string> = {
+  video: 'bg-brand',
+  user: 'bg-teal',
+  pending: 'bg-sand',
+};
+
+/** 6px 점 — 간격이 아니라 부품 규격이라 4배수 예외 */
+function Dot({ source }: { source: Fact['source'] }) {
+  return <span className={cn('size-1.5 shrink-0 rounded-full', SOURCE_DOT[source])} aria-hidden />;
+}
+
+function Legend({ source, children }: { source: Fact['source']; children: React.ReactNode }) {
+  return (
+    <span className="inline-flex items-center gap-1">
+      <Dot source={source} />
+      {children}
+    </span>
+  );
+}
+
+function SectionTitle({
+  icon,
+  children,
+}: {
+  icon: 'clock' | 'file' | 'check';
+  children: React.ReactNode;
+}) {
   return (
     <p className="flex items-center gap-1 text-[12px] font-semibold text-muted">
       <Icon name={icon} size={14} />
@@ -151,6 +179,35 @@ export function StatusPanel({
             );
           })}
         </div>
+
+        {/*
+          확인된 사실 — 영상 분석에서 확정된 것만 칩이 된다. 영상으로 확인하지 못한
+          과실 요소는 "확인 필요"(모래빛)로 붙는다. 제목 문장은 서버가 만들어 준다.
+          분석 전에는 facts가 null이라 이 묶음을 아예 그리지 않는다.
+
+          누를 수 없다 — 고치기는 9/3에 뺀 채로 둔다 (04 문서 C1).
+        */}
+        {item.facts && item.facts.items.length > 0 && (
+          <div className="flex flex-col gap-2">
+            <SectionTitle icon="check">{item.facts.label}</SectionTitle>
+            <div className="flex items-center gap-3 text-[12px] leading-[1.35] text-muted">
+              <Legend source="video">영상</Legend>
+              <Legend source="user">내가 말함</Legend>
+              <Legend source="pending">확인 필요</Legend>
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {item.facts.items.map((f) => (
+                <span
+                  key={`${f.source}:${f.label}`}
+                  className="box-border inline-flex items-center gap-1 rounded-full border border-line bg-surface px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2"
+                >
+                  <Dot source={f.source} />
+                  {f.label}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col gap-1">
           <SectionTitle icon="file">서류</SectionTitle>

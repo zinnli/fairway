@@ -49,6 +49,26 @@ export interface VideoRef {
   streamUrl?: string;
 }
 
+/**
+ * 확인된 사실 — 현황판의 칩 묶음 (9/6에 되살렸다. 04 문서 C2에서 뺐던 것이다).
+ *
+ * **영상 분석에서 확정된 것만** 칩이 된다. 영상으로 확인하지 못한 과실 요소는
+ * `pending`("확인 필요")으로 붙는다. 고치는 길은 없다 — 9/3에 뺀 채로 둔다.
+ */
+export interface Fact {
+  label: string;
+  /** 서버는 지금 video·pending만 준다. user는 나중에 늘어날 자리다 */
+  source: 'video' | 'user' | 'pending';
+}
+
+export interface Facts {
+  confirmed: number;
+  total: number;
+  /** "확인된 사실 5 / 6 · 남은 1개는 쟁점이에요" — 서버가 만든 문장을 그대로 쓴다 */
+  label: string;
+  items: Fact[];
+}
+
 export interface Case {
   id: string;
   /** 분석 뒤 AI가 자동으로 붙인다. 그 전에는 null */
@@ -60,6 +80,8 @@ export interface Case {
   accidentAt: string | null;
   accidentPlace: string | null;
   claimNo: string | null;
+  /** 영상 분석 전에는 null — 그때는 현황판에서 이 묶음을 아예 그리지 않는다 */
+  facts: Facts | null;
   createdAt: string;
   updatedAt: string;
 }

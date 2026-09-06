@@ -6,6 +6,7 @@ import type { ActiveJob, CaseDetail, CaseEvents, CaseService, Session } from '..
 import {
   ANALYSIS_SUMMARY,
   DEMO_CASES,
+  DEMO_FACTS,
   DEMO_PRECEDENT_IMAGE,
   DEMO_QUESTIONS,
   DEMO_REBUTTAL,
@@ -105,6 +106,8 @@ async function runAnalysis(caseId: string) {
   if (!find(caseId)) return;
 
   c.title ??= '교차로 직진 충돌 · 08-22';
+  /* 확인된 사실은 영상 분석이 끝나야 생긴다 — 그 전에는 null이라 현황판에 안 뜬다 */
+  c.facts = DEMO_FACTS;
   push(caseId, { role: 'ai', kind: 'text', text: ANALYSIS_SUMMARY });
   push(caseId, { role: 'ai', kind: 'text', text: DEMO_QUESTIONS[0] });
   asked[caseId] = 1;
@@ -218,6 +221,7 @@ export const mockService: CaseService = {
       stages: emptyStages(),
       video: null,
       verdict: null,
+      facts: null,
       accidentAt: null,
       accidentPlace: null,
       claimNo: null,

@@ -130,7 +130,10 @@ export function StatementDialog({
               <h3 className="text-[15px] font-semibold text-ink">
                 {i + 1}. {section.title}
               </h3>
-              <p className="text-[15px] leading-[1.8] text-ink">{section.body}</p>
+              {/* 서버가 문장마다 줄을 바꿔 보낸다 (9/6) — 그 줄바꿈을 살린다 */}
+              <p className="text-[15px] leading-[1.8] whitespace-pre-line text-ink">
+                {section.body}
+              </p>
             </section>
           ))}
         </div>
@@ -150,7 +153,8 @@ export function PrintableStatement({ doc, title }: { doc: Statement; title: stri
           <h2>
             {i + 1}. {section.title}
           </h2>
-          <p>{section.body}</p>
+          {/* 인쇄 화면도 문장별 줄로 나가야 한다 */}
+          <p className="whitespace-pre-line">{section.body}</p>
         </section>
       ))}
       <p>{DISCLAIMER}</p>
