@@ -12,7 +12,7 @@ import { CaseWorkspacePage } from '@/pages/CaseWorkspacePage';
 /**
  * 라우트는 5개뿐이다 (docs/frontend-plan.md 5절).
  * /cases/:caseId 하나가 h12~h37 + f01·f03·f04 + m05~m13을 전부 흡수한다.
- * (h39·f02는 9/3 축소로 빠졌다 — docs/handoff/04_기획축소_0903.md)
+ * (h39·f02는 9/3 축소로 빠졌다 — docs/handoff/04_기획변경.md)
  * 온보딩은 사건이 0개일 때 뜨는 모달이라 길을 따로 내지 않는다.
  * S5(경위서 전문)·S6(반박의견서)도 라우트가 아니라 모달이다.
  *

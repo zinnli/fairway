@@ -37,6 +37,9 @@ let seq = 0;
 const nextId = () => `m${++seq}`;
 /** 답을 이만큼 기다려도 안 오면 기다림 표시를 걷는다 */
 const REPLY_TIMEOUT_MS = 60_000;
+
+/** 요청 없이 [다시 쓰기]만 눌렀을 때 서버에 보낼 말. 빈 문자열은 422다 (F-4) */
+const REWRITE_ANY = '고칠 곳을 따로 적지 않았어요. 전체를 다시 정리해 주세요.';
 const now = () => new Date().toISOString();
 
 export function CaseWorkspacePage() {
@@ -111,6 +114,8 @@ export function CaseWorkspacePage() {
   const [activeJob, setActiveJob] = useState<ActiveJob | null>(null);
   /* 화면이 세워 둔 로딩 카드. 작업이 끝나면 치운다 */
   const loadingCardId = useRef<string | null>(null);
+  /** 그 카드가 무슨 일을 기다리는 중인지. 일이 바뀌면 글자도 바뀌어야 한다 */
+  const loadingPhase = useRef<ActiveJob['kind'] | null>(null);
   /* 내가 보낸 글에 대한 답을 기다리는 카드. Job이 없어서 activeJob으로는 못 잡는다 */
   const replyCardId = useRef<string | null>(null);
   /* 카드를 세우기 **전에** 답을 기다리기 시작한다 — 답이 POST 응답보다 먼저 올 수 있다 */
@@ -338,10 +343,20 @@ export function CaseWorkspacePage() {
     await runDocJob('report', () => service.createStatement(caseId));
   }, [caseId, openStatement, runDocJob]);
 
-  /* 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드가 아래에 붙는다 */
+  /**
+   * 다시 쓰기 — 대화는 앞으로만 가므로 고쳐 끼우지 않고 새 버전 카드가 아래에 붙는다.
+   *
+   * **빈 요청은 서버가 받지 않는다** — F-4는 `request`를 1~500자로 받고,
+   * 빈 문자열이면 422(`VALIDATION_FAILED`)로 돌려보낸다. 그런데 요청을 적을 칸이
+   * 있는 곳은 전문 모달(h30)뿐이고, 채팅 카드(h26)의 단추에는 아예 없다.
+   * 그냥 누른 것은 "특별히 고칠 데는 없고 한 번 더 써 달라"는 뜻이므로,
+   * 그 말을 채워서 보낸다. 빈 칸으로 둔 모달도 같은 길을 탄다.
+   */
   const rewriteStatement = useCallback(
     async (instruction?: string) =>
-      runDocJob('report', () => service.reviseStatement(caseId, instruction ?? '')),
+      runDocJob('report', () =>
+        service.reviseStatement(caseId, instruction?.trim() || REWRITE_ANY),
+      ),
     [caseId, runDocJob],
   );
 
@@ -431,6 +446,7 @@ export function CaseWorkspacePage() {
     let stop: (() => void) | null = null;
     activeCase.current = caseId;
     loadingCardId.current = null;
+    loadingPhase.current = null;
     dropReplyCard();
     fetchedVersion.current = null;
 
@@ -453,7 +469,24 @@ export function CaseWorkspacePage() {
             if (message.role === 'ai') dropReplyCard();
             dispatch({ type: 'append', message });
           },
-          messageUpdated: (message) => dispatch({ type: 'settle', message }),
+          /*
+            다시 쓴 서류와 갱신된 판정은 제자리에서 바꾸지 않고 대화 끝으로 옮긴다 —
+            저 위에서 조용히 바뀌면 달라진 티가 안 난다.
+
+            판정도 갱신된다: 판정 뒤에 "상대 보험사가 30:70이래요"라고 말하면 서버가
+            같은 id의 카드를 `message.updated`로 다시 보낸다(비교 막대가 채워진다).
+            영상 메타 갱신처럼 자리를 지켜야 하는 것은 그대로 settle이다.
+          */
+          messageUpdated: (message) =>
+            dispatch({
+              type:
+                message.kind === 'statementDraft' ||
+                message.kind === 'rebuttalDraft' ||
+                message.kind === 'verdict'
+                  ? 'revise'
+                  : 'settle',
+              message,
+            }),
           caseUpdated: (item, activeJobNow) => {
             setLoaded({ id: caseId, item });
             setActiveJob(activeJobNow);
@@ -486,15 +519,25 @@ export function CaseWorkspacePage() {
   }, [caseId, dropReplyCard, refresh, reloadList]);
 
   /**
-   * 분석 중·판정 중에는 로딩 카드 한 장을 세운다 (04 문서 C6 — 단계 표시는 없다).
+   * 일이 도는 동안 기다림 카드 한 장을 세운다 (04 문서 C6 — 단계 표시는 없다).
    * 서버가 단계를 내려보내지 않으므로 화면이 activeJob만 보고 세웠다 치운다.
+   *
+   * 서류 작업(report·rebuttal)도 세운다. 예전에는 단추 글자만 바뀌었는데,
+   * 그 단추는 저 위 카드에 있어서 대화를 보고 있으면 무슨 일이 도는지 몰랐다.
+   * 단추 잠금은 그대로 둔다 — 두 번 청하는 것은 여전히 막아야 한다.
    */
   useEffect(() => {
-    /* 서류 작업(report·rebuttal)은 카드를 세우지 않는다 — 단추만 잠근다 */
-    const phase =
-      activeJob?.kind === 'analysis' || activeJob?.kind === 'verdict' ? activeJob.kind : null;
-    if (phase && loadingCardId.current === null) {
-      /* 답 대신 분석·판정이 시작된 경우다. 로딩 카드가 두 장 서지 않게 먼저 치운다 */
+    const phase = activeJob?.kind ?? null;
+    if (phase === loadingPhase.current) return;
+
+    /* 일이 바뀌었으면 서 있던 카드부터 내린다 — 안 내리면 분석이 끝나고 판정이
+       도는 동안에도 "영상을 분석하고 있어요"가 그대로 남는다 */
+    if (loadingCardId.current !== null) {
+      dispatch({ type: 'drop', id: loadingCardId.current });
+      loadingCardId.current = null;
+    }
+    if (phase) {
+      /* 답 대신 다른 일이 시작된 경우다. 기다림 카드가 두 장 서지 않게 먼저 치운다 */
       dropReplyCard();
       const id = nextId();
       loadingCardId.current = id;
@@ -503,10 +546,7 @@ export function CaseWorkspacePage() {
         message: { id, at: now(), role: 'ai', kind: 'analyzing', phase },
       });
     }
-    if (!phase && loadingCardId.current !== null) {
-      dispatch({ type: 'drop', id: loadingCardId.current });
-      loadingCardId.current = null;
-    }
+    loadingPhase.current = phase;
   }, [activeJob, dropReplyCard]);
 
   /** 이 사건의 전문을 받아 뒀나. 아니면 카드가 아는 만큼만 보여 준다 */
@@ -603,11 +643,34 @@ export function CaseWorkspacePage() {
     null;
   const statement = lastOf('statementDraft')?.doc ?? null;
   const rebuttal = lastOf('rebuttalDraft')?.doc ?? null;
+  /* 만들기 단추를 내리는 기준은 셋 다 같다 — **초안 카드가 대화에 붙었는가**.
+     보낸 뒤에도 초안 카드는 로그에 남으므로 그대로 내려가 있다 */
+  const rebuttalExists = rebuttal !== null;
+  /* 보냈는지는 발송 카드로 안다 — 초안 카드의 sentAt은 서버가 늘 null로 준다 (map.ts) */
+  const rebuttalSent = lastOf('sent') !== null || rebuttal?.sentAt != null;
   /* 참고용 고지는 화면당 한 번(규칙 0.2). 판정·경위서 카드가 이미 달고 나온다 */
   const disclaimerCardId =
     [...chat.messages]
       .reverse()
       .find((m) => m.kind === 'verdict' || m.kind === 'statementDraft')?.id ?? null;
+
+  /**
+   * [영상 올리기]가 설 자리 — 화면 전체에서 딱 하나다.
+   *
+   * 단추를 다는 곳이 둘이라 겹쳤다: 접수 안내 카드(h12)와, 영상 없이 이야기부터
+   * 시작했을 때 서버가 답에 붙여 보내는 단추(h13). 영상을 올리기 전까지는
+   * **대화의 맨 끝**에 있는 AI 말 한 곳만 단추를 맡고, 나머지는 그리지 않는다.
+   *
+   * 올리고 나면 아무도 맡지 않는다 — 대화는 앞으로만 가므로(00 문서 6절)
+   * 다 지난 자리에 단추가 남아 있을 이유가 없다.
+   */
+  const hasVideo =
+    Boolean(item?.video) || chat.messages.some((m) => m.kind === 'video' || m.kind === 'uploading');
+  const uploadCardId = hasVideo
+    ? null
+    : ([...chat.messages]
+        .reverse()
+        .find((m) => m.kind === 'guide' || (m.kind === 'text' && m.role === 'ai'))?.id ?? null);
 
   useEffect(() => {
     messagesRef.current = chat.messages;
@@ -716,6 +779,7 @@ export function CaseWorkspacePage() {
                 key={message.id}
                 message={message}
                 withDisclaimer={message.id === disclaimerCardId}
+                showUpload={message.id === uploadCardId}
                 actions={{
                   onPickVideo: pickVideo,
                   onPickSample: (file) => void pickSample(file),
@@ -728,6 +792,8 @@ export function CaseWorkspacePage() {
                   onRewriteStatement: () => void rewriteStatement(),
                   statementRewriting: rewriting,
                   onCreateRebuttal: () => void createRebuttal(),
+                  rebuttalExists,
+                  rebuttalSent,
                   onOpenRebuttal: () => void openRebuttal(),
                   onOpenProcess: () => pop('process'),
                   onOpenVideo: (video) => void openVideo(video),

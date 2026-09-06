@@ -6,6 +6,7 @@ import type { ActiveJob, CaseDetail, CaseEvents, CaseService, Session } from '..
 import {
   ANALYSIS_SUMMARY,
   DEMO_CASES,
+  DEMO_FACTS,
   DEMO_PRECEDENT_IMAGE,
   DEMO_QUESTIONS,
   DEMO_REBUTTAL,
@@ -105,6 +106,8 @@ async function runAnalysis(caseId: string) {
   if (!find(caseId)) return;
 
   c.title ??= '교차로 직진 충돌 · 08-22';
+  /* 확인된 사실은 영상 분석이 끝나야 생긴다 — 그 전에는 null이라 현황판에 안 뜬다 */
+  c.facts = DEMO_FACTS;
   push(caseId, { role: 'ai', kind: 'text', text: ANALYSIS_SUMMARY });
   push(caseId, { role: 'ai', kind: 'text', text: DEMO_QUESTIONS[0] });
   asked[caseId] = 1;
@@ -138,8 +141,10 @@ const latestStatement = (caseId: string): Statement | null => {
 /* ── 구현 ─────────────────────────────────────────────────────────────── */
 
 /**
- * 목의 세션 — 자격은 보지 않지만 **로그인은 실제로 거쳐야 한다** (9/5 결정).
- * 그러지 않으면 목으로 도는 동안에는 가드가 아무것도 막지 못한다.
+ * 목의 세션 — 자격은 보지 않는다. 로그인을 **거쳐도 되고 건너뛰어도 된다**:
+ * 목일 때는 `RequireSession`이 통과시키므로 `/cases`에 바로 들어갈 수 있다.
+ * 거치면 그 메일이 사이드바에 뜨고, 안 거치면 "체험 중"으로 뜬다.
+ * (서버에 붙는 빌드에서는 9/5 결정대로 로그인이 필수다.)
  *
  * 새로고침해도 남아야 해서 브라우저에 적어 둔다. 목에는 토큰이 없고 누구인지만 적으므로
  * "액세스 토큰은 메모리에만" 규칙과 부딪히지 않는다 — http 구현은 지금도 메모리다.
@@ -218,6 +223,7 @@ export const mockService: CaseService = {
       stages: emptyStages(),
       video: null,
       verdict: null,
+      facts: null,
       accidentAt: null,
       accidentPlace: null,
       claimNo: null,
@@ -453,12 +459,15 @@ export const mockService: CaseService = {
     if (!c) return;
     await wait(1200);
     const draft = [...(logs[caseId] ?? [])].reverse().find((m) => m.kind === 'rebuttalDraft');
-    const to = draft && draft.kind === 'rebuttalDraft' ? draft.doc.to : DEMO_REBUTTAL.to;
+    const doc = draft && draft.kind === 'rebuttalDraft' ? draft.doc : DEMO_REBUTTAL;
+    const to = doc.to;
+    /* 서버는 실제로 붙인 파일을 센다 — 목도 [보내기]에서 켜 둔 것만 센다 (명세 §4.10) */
+    const attachmentCount = doc.attachments.filter((a) => a.included).length;
     const at = now();
     if (draft && draft.kind === 'rebuttalDraft') draft.doc = { ...draft.doc, sentAt: at };
     c.stages = { ...c.stages, rebuttal: '완료' };
     c.status = '발송 완료';
-    push(caseId, { role: 'ai', kind: 'sent', to });
+    push(caseId, { role: 'ai', kind: 'sent', to, attachmentCount });
     push(caseId, { role: 'ai', kind: 'nextSteps' });
     emit(caseId, (on) => on.rebuttalSent?.(at, to));
     touch(caseId);

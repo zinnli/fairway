@@ -167,12 +167,17 @@ export function RebuttalDialog({
           <label htmlFor="rebuttal-body" className="text-[12.5px] font-medium text-muted">
             본문
           </label>
+          {/*
+            본문은 "담당자님께, / 1. 주장하는 과실비율 / … / 감사합니다." 꼴의
+            여러 줄 편지다 (9/6). rows 5로는 첫 두 줄만 보여서 무엇이 나가는지 몰랐다.
+            textarea는 줄바꿈을 원래 살리므로 높이만 넓히면 된다.
+          */}
           <textarea
             id="rebuttal-body"
             value={body}
             onChange={(e) => setBody(e.target.value)}
-            rows={5}
-            className="box-border resize-none rounded-md border border-line bg-surface px-4 py-3 text-[15px] leading-[1.6] text-ink focus-visible:border-brand"
+            rows={16}
+            className="box-border resize-y rounded-md border border-line bg-surface px-4 py-3 text-[15px] leading-[1.6] text-ink focus-visible:border-brand"
           />
         </div>
 

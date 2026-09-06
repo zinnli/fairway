@@ -18,6 +18,11 @@ export type ChatAction =
   /** 진행 중이던 카드를 끝난 모양으로 갈아 끼운다 (업로드 완료·분석 종료).
    *  지우는 게 아니라 그 자리를 바꾸는 것이라 "추가만" 원칙과 어긋나지 않는다 */
   | { type: 'settle'; message: ChatMessage }
+  /** 새 버전으로 갈아 끼우고 **맨 아래로 옮긴다** (경위서·반박의견서 다시 쓰기).
+   *  서버는 다시 쓰기를 `message.updated`로 보내서(명세 F-4) 카드가 제자리에 머무는데,
+   *  그러면 저 위에서 조용히 바뀌어 다시 쓴 티가 안 난다. 카드를 하나 더 만들지 않고
+   *  있던 것을 대화 끝으로 옮긴다 — 대화는 앞으로만 가기 때문이다 (00 문서 6절) */
+  | { type: 'revise'; message: ChatMessage }
   /** 화면이 잠깐 세워 둔 카드를 치운다 (업로드 중·분석 중).
    *  서버가 만든 진짜 카드가 도착하면 그 자리를 내준다 — 로그에 남는 카드는 지우지 않는다 */
   | { type: 'drop'; id: string };
@@ -45,6 +50,11 @@ export function chatReducer(state: ChatState, action: ChatAction): ChatState {
     case 'settle':
       return {
         messages: state.messages.map((m) => (m.id === action.message.id ? action.message : m)),
+      };
+
+    case 'revise':
+      return {
+        messages: [...state.messages.filter((m) => m.id !== action.message.id), action.message],
       };
 
     case 'drop':

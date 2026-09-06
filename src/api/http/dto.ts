@@ -61,6 +61,13 @@ export interface CaseSummaryDto {
   updatedAt: string;
 }
 
+export interface FactsDto {
+  confirmed: number;
+  total: number;
+  label: string;
+  items: { label: string; source: 'video' | 'user' | 'pending'; field: string | null }[];
+}
+
 export interface CaseDto {
   id: string;
   title: string;
@@ -75,6 +82,8 @@ export interface CaseDto {
     rebuttal: { exists: boolean; locked: boolean; label: string };
   };
   video: { id: string; filename: string; durationSec: number; sizeLabel: string } | null;
+  /** 영상 분석 전에는 null. case.updated 본문에도 같은 값이 온다 */
+  facts: FactsDto | null;
   activeJob: JobDto | null;
   disclaimer: string;
   createdAt: string;
@@ -127,6 +136,8 @@ export interface VerdictPayloadDto {
   ratio: RatioDto;
   summary: string;
   opponentClaim: RatioDto | null;
+  /** 항상 온다. 주장이 없을 때는 "아직 없어요 …"를 알려 주는 문장이 온다 */
+  opponentClaimNote: string;
   basis: {
     chart: { name: string; note: string };
     precedents: PrecedentRefDto[];

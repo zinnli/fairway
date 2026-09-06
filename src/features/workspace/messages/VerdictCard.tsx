@@ -1,16 +1,47 @@
 import { Dots } from '@/components/ui/Dots';
 import { Button } from '@/components/ui/Button';
 import { Icon } from '@/components/ui/Icon';
-import { DISCLAIMER } from '@/config';
+import { RatioBar } from '@/components/ui/RatioBar';
+import { APP_NAME, DISCLAIMER } from '@/config';
 import { formatRatio, type Precedent, type Verdict } from '@/domain/verdict';
+import { breakSentences } from '@/lib/format';
+import { MessageCard } from './MessageCard';
+
+/**
+ * 상대 주장과 견준 한 줄 — 시안 h21의 초록 화살표 줄.
+ * 문장은 서버가 만든다. 화면은 어느 쪽이 낮은지만 보고 색과 화살표를 고른다.
+ */
+function ClaimNote({ verdict }: { verdict: Verdict }) {
+  const claim = verdict.opponentClaim;
+  /* 주장이 없으면 견줄 것도 없다 — 화살표 없이 정보 글자로만 청한다 */
+  if (!claim) {
+    return <p className="text-[12.5px] leading-[1.5] text-muted">{verdict.opponentClaimNote}</p>;
+  }
+
+  const lower = verdict.ratio.mine < claim.mine;
+  const higher = verdict.ratio.mine > claim.mine;
+  const tone = lower ? 'text-teal-text' : higher ? 'text-sand-text' : 'text-muted';
+
+  return (
+    <p className={`flex items-start gap-1 text-[13.5px] leading-[1.5] font-semibold ${tone}`}>
+      {(lower || higher) && (
+        <span className="mt-1 flex shrink-0" aria-hidden>
+          <Icon name={lower ? 'arrowDown' : 'arrowUp'} size={13} strokeWidth={2} />
+        </span>
+      )}
+      <span className="min-w-0">{verdict.opponentClaimNote}</span>
+    </p>
+  );
+}
 
 /**
  * 판정 — h21. 61화면의 기준 화면이다.
- * 9/3 축소로 파란 강조 박스가 전부 빠졌다 (04 문서 C5):
- * "근거 N건 · 쟁점 N건" 알약 · 일치도(%) · 상대 주장 비교 · 차이 %p 안내 · 쟁점 줄.
  *
- * 남는 것은 비율 · 한 줄 결론 · 근거 목록뿐이다.
- * 도표 번호는 미확정이라 chartNo가 null이면 번호 칸을 아예 숨긴다.
+ * 9/3에 파란 강조 박스를 전부 뺐다가(04 문서 C5) 9/6에 **비교 막대와 견주는 한 줄만**
+ * 되살렸다(04 문서 R2). 여전히 없는 것은 "근거 N건 · 쟁점 N건" 알약 · 일치도(%) · 쟁점 줄이다.
+ *
+ * 그래서 남는 것은 비율 · 한 줄 결론 · 비교 막대 · 근거 목록 넷이다.
+ * 도표 번호는 서버가 chartName 앞머리에 실어 보낸다 — 화면이 따로 그리지 않는다.
  */
 export function VerdictCard({
   verdict,
@@ -33,7 +64,7 @@ export function VerdictCard({
   const { ratio } = verdict;
 
   return (
-    <div className="flex w-full max-w-140 min-w-0 flex-col gap-3 rounded-lg bg-surface p-4 shadow-[0_4px_12px_rgba(17,20,26,0.06)] md:p-6">
+    <MessageCard>
       <div className="flex items-center gap-2">
         <span className="flex shrink-0 text-brand" aria-hidden>
           <Icon name="shield" size={16} />
@@ -52,7 +83,33 @@ export function VerdictCard({
         {ratio.opponent}
       </p>
 
-      <p className="text-[15px] leading-[1.6] text-ink">{verdict.conclusion}</p>
+      {/*
+        한 줄 결론 — 서버가 문장 둘을 붙여 보낼 때가 있다("…일방과실이에요. 내 차가…").
+        온점 뒤에서 끊어 문장마다 한 줄로 둔다. 이미 끊겨 왔으면 손대지 않는다.
+        판정 카드에서만 하는 일이다 — 대화의 다른 말은 온 그대로 보여 준다.
+      */}
+      <p className="text-[15px] leading-[1.6] whitespace-pre-line text-ink">
+        {breakSentences(verdict.conclusion)}
+      </p>
+
+      {/*
+        비율 막대 — 시안 h21·h23. 상대 보험사가 주장하는 비율을 사용자가 대화에서
+        말해 줬을 때만 위 칸이 선다(`opponentClaim`이 null이면 서버가 모른다는 뜻).
+        비교할 것이 없으면 우리 판정 막대 하나만 남고, 아래 줄이 알려 달라고 청한다.
+
+        연보라(brand-line) 8px = 상대 주장 · 진보라(brand) 10px = 우리 판정.
+        높이 8/10은 간격이 아니라 부품 규격이라 4배수 예외다.
+
+        견주는 한 줄(`opponentClaimNote`)은 **서버가 만들어 준다** — 화면이 %p를
+        세지 않는다. 내 과실이 낮으면 초록·↓, 높으면 모래빛·↑, 나머지는 그냥 글이다.
+      */}
+      <div className="flex flex-col gap-3">
+        {verdict.opponentClaim && (
+          <RatioBar label="상대 보험사 주장" ratio={verdict.opponentClaim} />
+        )}
+        <RatioBar label={`${APP_NAME} 판정`} ratio={ratio} emphasis />
+        {verdict.opponentClaimNote && <ClaimNote verdict={verdict} />}
+      </div>
 
       <div className="h-px bg-line" />
 
@@ -71,11 +128,8 @@ export function VerdictCard({
             <Icon name="file" size={14} />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block text-ink">
-              인정기준 도표
-              {verdict.chartNo && <span className="tnum"> {verdict.chartNo}</span>} —{' '}
-              {verdict.chartName}
-            </span>
+            {/* 번호는 서버가 이름 앞에 붙여 준다 — 화면이 따로 그리지 않는다 (9/6) */}
+            <span className="block text-ink">인정기준 도표 — {verdict.chartName}</span>
             {verdict.chartNote && (
               <span className="block text-[12.5px] leading-[1.5] text-muted">
                 {verdict.chartNote}
@@ -142,6 +196,6 @@ export function VerdictCard({
       )}
 
       {withDisclaimer && <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>}
-    </div>
+    </MessageCard>
   );
 }

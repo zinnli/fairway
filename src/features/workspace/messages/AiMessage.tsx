@@ -29,6 +29,9 @@ export function AiMessage({ children, className }: { children: ReactNode; classN
  * (분석 요약의 문장 단위 줄, 심의사례 목록의 항목별 줄). 그대로 <p>에 넣으면
  * 브라우저가 전부 한 줄로 붙여 버린다. 이 한 줄이 줄바꿈만 살리고
  * 잇단 공백은 그대로 접어 준다.
+ *
+ * 서버가 줄바꿈을 빠뜨려 보내도 여기서 손대지 않는다 — 온 그대로 보여 준다.
+ * 문장마다 끊는 것은 판정 카드의 결론 줄 하나뿐이다(VerdictCard).
  */
 export function AiText({ children }: { children: ReactNode }) {
   const body = typeof children === 'string' ? splitQuestionCount(children) : null;

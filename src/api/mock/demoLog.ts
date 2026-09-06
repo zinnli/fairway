@@ -81,7 +81,12 @@ export const DEMO_LOGS: Record<string, ChatMessage[]> = {
     ...VERDICT_STEP,
     { role: 'ai', kind: 'statementDraft', doc: DEMO_STATEMENT },
     { role: 'ai', kind: 'rebuttalDraft', doc: DEMO_REBUTTAL },
-    { role: 'ai', kind: 'sent', to: DEMO_REBUTTAL.to },
+    {
+      role: 'ai',
+      kind: 'sent',
+      to: DEMO_REBUTTAL.to,
+      attachmentCount: DEMO_REBUTTAL.attachments.filter((a) => a.included).length,
+    },
     { role: 'ai', kind: 'nextSteps' },
   ]),
 

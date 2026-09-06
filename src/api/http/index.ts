@@ -54,10 +54,11 @@ function caseWithRatio(c: CaseDto): Case {
   const ratio = { mine: c.verdict.ratio.mine, opponent: c.verdict.ratio.other };
   const lite: Verdict = {
     ratio,
+    opponentClaim: null,
+    opponentClaimNote: '',
     conclusion: '',
     chartName: '',
     chartNote: null,
-    chartNo: null,
     baseRatio: ratio,
     adjustments: [],
     precedents: [],

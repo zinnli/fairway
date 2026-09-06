@@ -14,7 +14,7 @@ function Line({ label, children }: { label: string; children: React.ReactNode })
   return (
     <div className="flex flex-col gap-1">
       <p className="text-[12.5px] font-medium text-muted">{label}</p>
-      <div className="text-[14px] leading-[1.6] text-ink">{children}</div>
+      <div className="text-[14px] leading-[1.6] whitespace-pre-line text-ink">{children}</div>
     </div>
   );
 }
@@ -90,7 +90,9 @@ function SectionBlock({ section }: { section: Section }) {
     return (
       <div className="mt-3 rounded-lg bg-bg-2 p-3">
         <p className="text-[14px] font-semibold text-ink">{section.label}</p>
-        <p className="mt-1 text-[14px] leading-[1.6] text-ink">{section.items.join(' ')}</p>
+        <p className="mt-1 text-[14px] leading-[1.6] whitespace-pre-line text-ink">
+          {section.items.join(' ')}
+        </p>
       </div>
     );
   }
@@ -106,7 +108,10 @@ function SectionBlock({ section }: { section: Section }) {
         <p className="mt-3 text-[14px] font-semibold text-ink">{section.label}</p>
       )}
       {section.items.map((item, i) => (
-        <p key={`${section.label ?? ''}-${i}`} className="text-[14px] leading-[1.6] text-ink">
+        <p
+          key={`${section.label ?? ''}-${i}`}
+          className="text-[14px] leading-[1.6] whitespace-pre-line text-ink"
+        >
           {bulleted && (
             <span className="mr-1 text-muted" aria-hidden>
               ·
