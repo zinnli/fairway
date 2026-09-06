@@ -37,11 +37,16 @@ export function LoginPage() {
   /* 메일 링크로 돌아오면 같은 길에서 새 비밀번호를 정한다 (A-8) — 라우트를 늘리지 않는다 */
   const [params, setParams] = useSearchParams();
   const resetToken = params.get('reset');
+  /* 가입 화면의 [이 이메일로 로그인하기]가 이메일을 실어 보낸다 — 받아서 채워 준다 */
+  const prefillEmail = (location.state as { email?: string } | null)?.email ?? '';
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<Form>({ resolver: zodResolver(schema) });
+  } = useForm<Form>({
+    resolver: zodResolver(schema),
+    defaultValues: { email: prefillEmail, password: '' },
+  });
 
   /* 가드에 막혀 왔다면 로그인한 뒤 원래 가려던 곳으로 돌려보낸다 */
   const from = (location.state as { from?: string } | null)?.from ?? '/cases';

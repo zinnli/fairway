@@ -60,7 +60,8 @@ export function SignupPage() {
    * 명세대로 **보조 수단**이라 실패해도 조용히 넘어간다 — 진짜 판정은 A-1이 한다.
    */
   const checkEmail = async (email: string) => {
-    if (!email || errors.email) return;
+    /* RHF의 errors는 블러 검증이 끝나기 전이라 여기서 못 믿는다 — 형식은 직접 본다 */
+    if (!z.email().safeParse(email).success) return;
     try {
       const { available, reason } = await service.isEmailAvailable(email);
       setDuplicateEmail(available ? null : email);
@@ -77,8 +78,12 @@ export function SignupPage() {
     register,
     handleSubmit,
     getValues,
-    formState: { errors, isValid },
+    formState: { errors, isValid, isSubmitting },
   } = useForm<Form>({ resolver: zodResolver(schema), mode: 'onTouched' });
+
+  /* 스프레드 뒤에 onBlur를 그냥 얹으면 register의 onBlur(터치 표시·onTouched 검증)가
+     통째로 덮여 이 칸만 검증이 죽는다 — 둘을 합성해 둘 다 부른다 */
+  const emailField = register('email');
 
   /** 채워졌는지·동의했는지는 저장하지 않고 매번 파생한다 */
   const allAgreed = TERM_ORDER.every((key) => agreed[key]);
@@ -127,8 +132,16 @@ export function SignupPage() {
               ? '이미 가입된 이메일이에요. 로그인해 주세요.'
               : (errors.email?.message ?? fieldErrors.email)
           }
-          {...register('email')}
-          onBlur={(e) => void checkEmail(e.target.value.trim())}
+          {...emailField}
+          onChange={(e) => {
+            /* 다른 주소를 고쳐 적는 동안 지난 중복 오류를 계속 붙여 두지 않는다 */
+            setDuplicateEmail(null);
+            void emailField.onChange(e);
+          }}
+          onBlur={(e) => {
+            void emailField.onBlur(e);
+            void checkEmail(e.target.value.trim());
+          }}
         />
         <Field
           label="비밀번호"
@@ -167,8 +180,8 @@ export function SignupPage() {
         </div>
 
         <div className="flex flex-col gap-2">
-          <Button type="submit" size="lg" disabled={!canSubmit}>
-            가입하기
+          <Button type="submit" size="lg" disabled={!canSubmit || isSubmitting}>
+            {isSubmitting ? '가입하는 중…' : '가입하기'}
           </Button>
           {!canSubmit && (
             <p className="text-center text-[12.5px] leading-[1.5] text-muted">
