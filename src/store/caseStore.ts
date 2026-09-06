@@ -12,6 +12,8 @@ interface CaseState {
   /** 이번에 온보딩을 닫았는지. 사건이 0개여도 다시 던지지 않으려고 둔다 */
   onboardingSeen: boolean;
   markOnboardingSeen: () => void;
+  /** 로그아웃·세션 만료 때 세션 스토어가 부른다 — 남의 사건 목록이 다음 로그인에 보이면 안 된다 */
+  reset: () => void;
   load: () => Promise<void>;
   create: () => Promise<string>;
   rename: (caseId: string, title: string) => Promise<void>;
@@ -24,6 +26,8 @@ export const useCaseStore = create<CaseState>((set, get) => ({
   onboardingSeen: false,
 
   markOnboardingSeen: () => set({ onboardingSeen: true }),
+
+  reset: () => set({ list: [], loaded: false, onboardingSeen: false }),
 
   load: async () => {
     const list = await service.listCases();

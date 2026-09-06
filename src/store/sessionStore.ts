@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { service, type Session } from '@/api';
+import { useCaseStore } from './caseStore';
 
 /**
  * 지금 누가 들어와 있는가. 라우트 가드가 이걸 본다.
@@ -52,8 +53,14 @@ export const useSessionStore = create<SessionState>((set) => ({
     /* 먼저 내리고 나서 서버에 알린다 — 화면은 기다릴 이유가 없다 */
     booted = true;
     set({ status: 'out', user: null, exit: '/' });
+    /* 사건 목록은 사람에 딸린 것이다. 남겨 두면 loaded가 true라 다시 읽지도 않아서
+       다음에 로그인한 사람에게 이전 사람의 사건 제목이 그대로 보인다 */
+    useCaseStore.getState().reset();
     await service.logout().catch(() => {});
   },
 
-  expire: () => set({ status: 'out', user: null, exit: '/login' }),
+  expire: () => {
+    set({ status: 'out', user: null, exit: '/login' });
+    useCaseStore.getState().reset();
+  },
 }));
