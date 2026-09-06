@@ -5,6 +5,7 @@ import { Sidebar } from '@/features/cases/Sidebar';
 import { service } from '@/api';
 import { OnboardingModal } from '@/features/onboarding/OnboardingModal';
 import { useCaseStore } from '@/store/caseStore';
+import { useSessionStore } from '@/store/sessionStore';
 
 /**
  * S3 사건 목록 — h08(빈 상태) · h09 · h10 · h11 · f05 (모바일 m04).
@@ -19,6 +20,9 @@ import { useCaseStore } from '@/store/caseStore';
 export function CasesPage() {
   const navigate = useNavigate();
   const { list, loaded, create, onboardingSeen, markOnboardingSeen } = useCaseStore();
+  /* 서버가 기억하는 온보딩 기록(A-10). 이걸 봐야 사건 0개인 기존 사용자에게
+     들어올 때마다 다시 뜨지 않는다 — 세션 안 표시(onboardingSeen)만으로는 모자라다 */
+  const onboardedAt = useSessionStore((s) => s.user?.onboardedAt ?? null);
   const empty = loaded && list.length === 0;
 
   return (
@@ -58,7 +62,7 @@ export function CasesPage() {
 
       {/* 끝까지 봤든 건너뛰었든 서버에 남긴다 — 다음에 들어올 때 다시 뜨지 않게 (A-10) */}
       <OnboardingModal
-        open={empty && !onboardingSeen}
+        open={empty && !onboardingSeen && onboardedAt === null}
         onClose={(skipped) => {
           markOnboardingSeen();
           void service.completeOnboarding(skipped);

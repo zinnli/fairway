@@ -50,6 +50,10 @@ export function OnboardingModal({
   onClose: (skipped: boolean) => void;
 }) {
   const ref = useRef<HTMLDialogElement>(null);
+  /* 부모가 open=false로 닫으면 native close 이벤트가 한 번 더 울린다. 그 메아리가
+     onClose(true)를 또 불러 A-10이 두 번 나가고, [새 사건 만들기]로 끝까지 본 기록이
+     곧바로 "건너뜀"으로 덮였다 — 우리가 닫은 것은 메아리로 치지 않는다 */
+  const echoClose = useRef(false);
   const titleId = useId();
   const [index, setIndex] = useState(0);
   const slide = SLIDES[index]!;
@@ -59,13 +63,22 @@ export function OnboardingModal({
     const el = ref.current;
     if (!el) return;
     if (open && !el.open) el.showModal();
-    if (!open && el.open) el.close();
+    if (!open && el.open) {
+      echoClose.current = true;
+      el.close();
+    }
   }, [open]);
 
   return (
     <dialog
       ref={ref}
-      onClose={() => onClose(true)}
+      onClose={() => {
+        if (echoClose.current) {
+          echoClose.current = false;
+          return;
+        }
+        onClose(true);
+      }}
       onCancel={(e) => {
         e.preventDefault();
         onClose(true);
