@@ -18,8 +18,12 @@ import { useSessionStore } from '@/store/sessionStore';
  * 온보딩(h06~h07)은 이 화면 위에 얹는다. 시안이 사건 목록 위에 덮인 모달로 그렸으므로
  * 라우트가 아니다. 닫으면 표시를 남겨 다시 열리지 않고 h08 빈 상태가 드러난다.
  *
- * **뜨는 기준은 "이 계정이 아직 온보딩을 보지 않았는가" 하나다** — 서버가 A-10으로 기억한다.
+ * **뜨는 기준은 "이 계정이 아직 온보딩을 보지 않았는가"다** — 서버가 A-10으로 기억한다.
  * 끝까지 봤든 건너뛰었든 기록이 남고, 그 뒤로는 다시 뜨지 않는다.
+ *
+ * **체험 계정은 예외다 — 사건이 0개면 들어올 때마다 뜬다.** A-10은 계정당 한 번인데,
+ * 심사위원 여럿이 계정 하나를 나눠 쓰면 첫 사람만 보게 된다. 체험 계정은 원래 "처음 온 사람"이
+ * 반복해서 쓰는 자리라 기록을 세지 않는다. 사건을 만들기 시작하면 더는 처음이 아니므로 멈춘다.
  *
  * 전에는 "사건이 0개"까지 함께(AND) 걸어 뒀는데, 사건이 하나라도 있으면 갓 가입한 사람에게도
  * 뜨지 않았다 — 목으로 볼 때는 시연 사건이 시드로 깔려 있어 아예 뜰 수가 없었다 (9/6 지적).
@@ -33,9 +37,12 @@ export function CasesPage() {
   /* 서버가 기억하는 온보딩 기록(A-10). 세션 안 표시(onboardingSeen)만으로는
      새로고침하면 다시 떠서, 계정에 남는 이 기록을 함께 본다 */
   const onboardedAt = useSessionStore((s) => s.user?.onboardedAt ?? null);
+  /* 체험 계정인가 (A-9 · 백엔드 시드의 데모 계정이 여기 해당한다) */
+  const isDemo = useSessionStore((s) => s.user?.isDemo ?? false);
   const empty = loaded && list.length === 0;
   /* 목록을 읽기 전에는 띄우지 않는다 — 뒤에 비칠 화면이 정해지기 전에 덮으면 한 번 번쩍인다 */
-  const onboarding = loaded && !onboardingSeen && onboardedAt === null;
+  const onboarding =
+    loaded && !onboardingSeen && (onboardedAt === null || (isDemo && empty));
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
