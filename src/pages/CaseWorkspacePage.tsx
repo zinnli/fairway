@@ -90,14 +90,22 @@ export function CaseWorkspacePage() {
    * 그림 주소의 서명은 10분짜리라 **열 때마다 새로 받는 지금 방식이 곧 갱신**이다.
    */
   const [precedentDoc, setPrecedentDoc] = useState<PrecedentDetail | null>(null);
+  /* 마지막으로 연 사례. 느린 응답이 나중에 도착해 다른 사례의 팝업을 덮지 않게 한다 */
+  const precedentWant = useRef<string | null>(null);
   const pop = (which: 'precedent' | 'process', precedent?: Precedent) => {
     setPopup({ key: viewKey, which, precedent });
     if (which === 'precedent' && precedent) {
       setPrecedentDoc(null);
+      const want = precedent.no;
+      precedentWant.current = want;
       void service
         .getPrecedent(caseId, precedent)
-        .then(setPrecedentDoc)
-        .catch(() => setPrecedentDoc(null));
+        .then((doc) => {
+          if (precedentWant.current === want) setPrecedentDoc(doc);
+        })
+        .catch(() => {
+          if (precedentWant.current === want) setPrecedentDoc(null);
+        });
     }
   };
   const fileRef = useRef<HTMLInputElement>(null);
@@ -135,6 +143,9 @@ export function CaseWorkspacePage() {
   /* 사건 한 장을 다시 읽는다. 이벤트가 끊겼을 때와 화면에 처음 들어올 때 쓴다 */
   const refresh = useCallback(async () => {
     const { item: fresh, activeJob: job } = await service.getCase(caseId);
+    /* 기다리는 사이 다른 사건으로 옮겼으면 버린다 — setLoaded는 id로 걸러지지만
+       setActiveJob은 무방비라, 이전 사건의 "분석 중"이 새 사건을 잠가 버린다 */
+    if (activeCase.current !== caseId) return fresh;
     setLoaded({ id: caseId, item: fresh });
     setActiveJob(job);
     void reloadList();
@@ -324,6 +335,14 @@ export function CaseWorkspacePage() {
           await call();
         } catch (e) {
           if (activeCase.current !== caseId) return;
+          /* 409(JOB_ALREADY_RUNNING)는 같은 일이 이미 돌고 있다는 뜻이다(명세 §2.6).
+             Job을 내리면 돌던 로딩 카드가 사라졌다가 잠시 뒤 카드가 "실패했는데
+             완성되는" 화면이 된다 — 서 있는 그대로 두고, 서버가 정해 준 문장
+             ("이미 진행 중이에요", retryable ✕라 닫기만 나온다)으로 알린다 */
+          if (isApiError(e) && e.status === 409) {
+            showFailure(e, () => void go());
+            return;
+          }
           /* 내가 세운 것만 내린다 */
           setActiveJob((cur) => (cur?.kind === kind ? null : cur));
           showFailure(e, () => void go());
@@ -451,6 +470,9 @@ export function CaseWorkspacePage() {
     loadingPhase.current = null;
     dropReplyCard();
     fetchedVersion.current = null;
+    /* 이전 사건의 대화를 즉시 내린다 — 새 대화가 올 때까지 남겨 두면 남의 카드가
+       그대로 보이고, 카드 단추는 이미 이 사건 id에 묶여 있어 엉뚱한 사건에 요청이 나간다 */
+    dispatch({ type: 'reset', messages: [] });
 
     Promise.all([service.getCase(caseId), service.listMessages(caseId)])
       .then(([{ item: c, activeJob: job }, past]) => {
@@ -607,15 +629,22 @@ export function CaseWorkspacePage() {
   const openRebuttal = useCallback(async () => {
     /* **받아 온 뒤에 연다.** 열어 놓고 나중에 갈아 끼우면, 그 사이 사용자가 적어 넣은
        받는이·접수번호·본문이 새 초안으로 덮여 지워진다 */
-    try {
-      const full = await service.getRebuttal(caseId);
-      if (activeCase.current !== caseId) return;
-      setFullRebuttal({ id: caseId, doc: full });
-    } catch {
-      /* 못 받으면 카드가 아는 만큼만 보여 준다 */
-    }
-    setDrawer({ key: viewKey, which: 'rebuttal' });
-  }, [caseId, viewKey]);
+    const run = async () => {
+      try {
+        const full = await service.getRebuttal(caseId);
+        if (activeCase.current !== caseId) return;
+        setFullRebuttal({ id: caseId, doc: full });
+      } catch (e) {
+        /* 경위서와 달리 **열어 주지 않는다** — 카드의 body는 잘린 미리보기라,
+           그걸로 열었다가 그대로 보내면 서버의 온전한 전문이 미리보기로 덮여 발송된다 */
+        if (activeCase.current !== caseId) return;
+        showFailure(e, () => void run());
+        return;
+      }
+      setDrawer({ key: viewKey, which: 'rebuttal' });
+    };
+    await run();
+  }, [caseId, viewKey, showFailure]);
 
   /**
    * PDF 받기 — 서버가 만들고(F-5) 인증을 붙여 받는다(F-6).
@@ -633,9 +662,12 @@ export function CaseWorkspacePage() {
     await run();
   }, [caseId, showFailure]);
 
+  /* 개수가 아니라 "맨 끝이 무엇인가"를 본다 — revise(다시 쓴 서류·갱신된 판정을 맨
+     아래로 옮김)는 개수를 안 바꿔서, 개수만 보면 옮겨 놓고 화면이 안 내려간다 */
+  const lastMessageId = chat.messages.at(-1)?.id ?? null;
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: 'end' });
-  }, [chat.messages.length]);
+  }, [lastMessageId]);
 
   /* 화면이 넓어져 사이드바·현황판이 붙박이가 되면 서랍은 남아 있을 이유가 없다.
      열어 둔 채로 창을 넓히면 같은 것이 두 번 보인다 */
@@ -850,6 +882,8 @@ export function CaseWorkspacePage() {
             item={item}
             statement={statement}
             rebuttal={rebuttal}
+            statementBusy={activeJob?.kind === 'report'}
+            rebuttalBusy={activeJob?.kind === 'rebuttal'}
             showDisclaimer={disclaimerCardId === null}
             onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
@@ -912,7 +946,12 @@ export function CaseWorkspacePage() {
         retryable={failure?.retryable}
         actions={failure?.actions}
         onClose={() => setFailure(null)}
-        onRetry={() => failure?.retry()}
+        onRetry={() => {
+          /* 닫고 나서 다시 탄다 — 열어 두면 성공해도 창이 남아 또 누르면 중복 요청이 나간다.
+             다시 실패하면 showFailure가 새 내용으로 도로 연다 */
+          setFailure(null);
+          failure?.retry();
+        }}
         onAction={(action) => {
           setFailure(null);
           if (action.type === 'retry_send') failure?.retry();
@@ -933,6 +972,8 @@ export function CaseWorkspacePage() {
             item={item}
             statement={statement}
             rebuttal={rebuttal}
+            statementBusy={activeJob?.kind === 'report'}
+            rebuttalBusy={activeJob?.kind === 'rebuttal'}
             showDisclaimer={disclaimerCardId === null}
             onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
             onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
