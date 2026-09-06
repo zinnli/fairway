@@ -120,7 +120,7 @@ export function MessageItem({
       );
 
     case 'analyzing':
-      return <AnalyzingCard phase={message.phase} done={message.done} />;
+      return <AnalyzingCard phase={message.phase} />;
 
     case 'verdict':
       return (

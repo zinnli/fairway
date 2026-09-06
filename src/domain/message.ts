@@ -39,7 +39,6 @@ export type ChatMessage = Base &
         role: 'ai';
         kind: 'analyzing';
         phase?: 'analysis' | 'verdict' | 'reply' | 'report' | 'rebuttal';
-        done?: boolean;
       }
     | { role: 'ai'; kind: 'verdict'; verdict: Verdict }
     | { role: 'ai'; kind: 'statementDraft'; doc: Statement }
@@ -50,8 +49,6 @@ export type ChatMessage = Base &
     /* steps는 서버가 준다. 없으면 화면이 아는 기본 문구를 쓴다 */
     | { role: 'ai'; kind: 'nextSteps'; steps?: string[] }
   );
-
-export type MessageKind = ChatMessage['kind'];
 
 /**
  * id·at 없이 알맹이만. 로그를 만들 때 쓴다.

@@ -43,7 +43,6 @@ import type {
 
 /** 서버는 other, 화면은 opponent. 이름만 다르고 뜻은 같다 */
 export const toRatio = (r: RatioDto): Ratio => ({ mine: r.mine, opponent: r.other });
-export const fromRatio = (r: Ratio): RatioDto => ({ mine: r.mine, other: r.opponent });
 
 const STATUS: Record<CaseStatusDto, CaseStatus> = {
   intake: '접수중',

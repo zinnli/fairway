@@ -562,9 +562,6 @@ export const mockService: CaseService = {
   },
 };
 
-/** 시연·리허설용. 목에만 있다 */
-export const resetDemo = () => loadDemo();
-
 /**
  * 영상 길이는 브라우저에게 물어본다. 못 읽으면 0을 준다 —
  * 코덱을 지원하지 않는 파일(mp4v·HEVC)이면 여기서 걸린다.

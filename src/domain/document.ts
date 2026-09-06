@@ -43,8 +43,3 @@ export interface Rebuttal {
   }[];
   sentAt: string | null;
 }
-
-export interface SentReceipt {
-  at: string;
-  to: string;
-}

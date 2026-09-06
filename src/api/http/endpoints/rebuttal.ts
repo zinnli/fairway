@@ -1,5 +1,5 @@
 import { newIdempotencyKey, request } from '../client';
-import type { JobDto, ListDto, RebuttalDto, SendLogDto, SendResultDto } from '../dto';
+import type { JobDto, RebuttalDto, SendResultDto } from '../dto';
 
 /** 5-G 반박의견서 */
 
@@ -41,6 +41,3 @@ export const send = (caseId: string, idempotencyKey = newIdempotencyKey()) =>
     headers: { 'Idempotency-Key': idempotencyKey },
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS),
   });
-
-export const sendLogs = (caseId: string) =>
-  request<ListDto<SendLogDto>>(`/cases/${caseId}/rebuttal/sends`);
