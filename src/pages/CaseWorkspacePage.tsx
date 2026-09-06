@@ -794,9 +794,18 @@ export function CaseWorkspacePage() {
     null;
   const statement = lastOf('statementDraft')?.doc ?? null;
   const rebuttal = lastOf('rebuttalDraft')?.doc ?? null;
-  /* 만들기 단추를 내리는 기준은 셋 다 같다 — **초안 카드가 대화에 붙었는가**.
-     보낸 뒤에도 초안 카드는 로그에 남으므로 그대로 내려가 있다 */
-  const rebuttalExists = rebuttal !== null;
+  /**
+   * 서류가 **있는지**는 대화만 보고 판단하지 않는다.
+   *
+   * 대화는 한 쪽(30장)만 들고 있어서, 초안을 만든 뒤 이야기가 길어지면 초안 카드가
+   * 창 밖으로 밀려난다. 그때 대화만 보면 "아직 없다"가 되어 현황판이 [만들기]를
+   * 다시 내주고, 누르면 이미 있는 서류를 또 만든다(409 아니면 새 버전).
+   * 있고 없고는 사건이 안다 — 진행 단계로 받는다.
+   *
+   * 내용(version·장수·본문)은 여전히 카드에서 온다. 카드가 없으면 열 때 받아 온다.
+   */
+  const statementExists = statement !== null || item?.stages.statement === '완료';
+  const rebuttalExists = rebuttal !== null || (item != null && item.stages.rebuttal !== '대기');
   /* 보냈는지는 발송 카드로 안다 — 초안 카드의 sentAt은 서버가 늘 null로 준다 (map.ts) */
   const rebuttalSent = lastOf('sent') !== null || rebuttal?.sentAt != null;
   /**
@@ -961,7 +970,7 @@ export function CaseWorkspacePage() {
                   sampleLoading: fetchingSample,
                   onOpenPrecedent: (p) => pop('precedent', p),
                   onCreateStatement: () => void createStatement(),
-                  statementExists: statement !== null,
+                  statementExists,
                   onOpenStatement: () => void openStatement(),
                   onPrintStatement: () => void savePdf(),
                   onRewriteStatement: () => void rewriteStatement(),
@@ -1006,8 +1015,10 @@ export function CaseWorkspacePage() {
             statementBusy={activeJob?.kind === 'report'}
             rebuttalBusy={activeJob?.kind === 'rebuttal'}
             showDisclaimer={disclaimerCardId === null}
-            onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
-            onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
+            statementExists={statementExists}
+            rebuttalExists={rebuttalExists}
+            onOpenStatement={() => (statementExists ? void openStatement() : void createStatement())}
+            onOpenRebuttal={() => (rebuttalExists ? void openRebuttal() : void createRebuttal())}
           />
         </div>
       )}
@@ -1096,8 +1107,10 @@ export function CaseWorkspacePage() {
             statementBusy={activeJob?.kind === 'report'}
             rebuttalBusy={activeJob?.kind === 'rebuttal'}
             showDisclaimer={disclaimerCardId === null}
-            onOpenStatement={() => (statement ? void openStatement() : void createStatement())}
-            onOpenRebuttal={() => (rebuttal ? void openRebuttal() : void createRebuttal())}
+            statementExists={statementExists}
+            rebuttalExists={rebuttalExists}
+            onOpenStatement={() => (statementExists ? void openStatement() : void createStatement())}
+            onOpenRebuttal={() => (rebuttalExists ? void openRebuttal() : void createRebuttal())}
           />
         )}
       </Drawer>
