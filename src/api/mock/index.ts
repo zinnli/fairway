@@ -175,7 +175,7 @@ const latestStatement = (caseId: string): Statement | null => {
  * 새로고침해도 남아야 해서 브라우저에 적어 둔다. 목에는 토큰이 없고 누구인지만 적으므로
  * "액세스 토큰은 메모리에만" 규칙과 부딪히지 않는다 — http 구현은 지금도 메모리다.
  */
-const SESSION_KEY = 'cardefender.mock.session';
+const SESSION_KEY = 'fairway.mock.session';
 
 const readSession = (): Session | null => {
   try {
