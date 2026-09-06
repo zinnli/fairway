@@ -48,6 +48,14 @@ const newCaseId = () =>
   `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 4)}`;
 const newMessageId = () => `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const now = () => new Date().toISOString();
+
+/* 반박의견서 제목은 서버가 접수번호로 만든다 (명세 G-2 `subjectAuto`) — 목도 같이 군다.
+   접수번호가 없을 때의 문장까지 명세 예시 그대로다 (5-G G-2 응답) */
+const autoSubject = (claimNo: string | null) =>
+  claimNo?.trim()
+    ? `과실비율 재검토 요청 (접수번호 ${claimNo.trim()})`
+    : '과실비율 재검토 요청 (접수번호는 아직 안 넣었어요)';
+const isAutoSubject = (subject: string) => /^과실비율 재검토 요청(\s*\([^()]*\))?$/.test(subject.trim());
 /* 서버가 F-3에서 만들어 주는 날짜 문구("08-25"). 목이 서버 노릇을 하니 목이 만든다 */
 const dateLabel = () => {
   const d = new Date();
@@ -497,6 +505,12 @@ export const mockService: CaseService = {
     const before =
       found && found.kind === 'rebuttalDraft' ? found.doc : { ...DEMO_REBUTTAL, sentAt: null };
     const next = { ...before, ...patch };
+    /* 서버는 접수번호가 바뀌면 제목을 다시 만든다 (명세 G-2 `subjectAuto`).
+       목이 그대로 두면 접수번호를 지웠는데 제목에는 옛 번호가 남아 카드가 어긋난다.
+       손으로 고친 제목은 건드리지 않는다 — 서버가 subjectAuto를 false로 내리는 것과 같다 */
+    if (patch.subject === undefined && isAutoSubject(before.subject)) {
+      next.subject = autoSubject(next.claimNo);
+    }
     if (found && found.kind === 'rebuttalDraft') found.doc = next;
     return next;
   },
