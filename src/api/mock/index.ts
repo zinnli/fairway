@@ -226,7 +226,11 @@ export const mockService: CaseService = {
   /* 목에는 가입자 명부가 없다. 시연에 걸리지 않게 늘 쓸 수 있다고 한다 */
   isEmailAvailable: async () => ({ available: true, reason: null }),
 
-  completeOnboarding: async () => {},
+  /* 서버는 A-10으로 이 시각을 기억한다 — 목도 남겨야 새로고침해도 다시 뜨지 않는다 */
+  completeOnboarding: async () => {
+    const user = readSession();
+    if (user) writeSession({ ...user, onboardedAt: now() });
+  },
 
   listCases: async () =>
     [...cases].sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).map(toSummary),
