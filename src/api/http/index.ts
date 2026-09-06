@@ -19,6 +19,7 @@ import * as verdictApi from './endpoints/verdict';
 import * as reportApi from './endpoints/report';
 import * as rebuttalApi from './endpoints/rebuttal';
 import { API_ORIGIN, downloadFile } from './client';
+import { isApiError } from './error';
 import { setToken } from './tokens';
 import { subscribeCase } from './sse';
 import type { CaseDto, JobDto, SessionDto } from './dto';
@@ -102,12 +103,25 @@ export const httpService: CaseService = {
    * refresh 쿠키로 한 번 되살려 보고, 안 되면 로그인 화면으로 보낸다.
    */
   restoreSession: async () => {
-    try {
+    const attempt = async (): Promise<Session> => {
       const { accessToken } = await authApi.refresh();
       setToken(accessToken);
       const user = await authApi.me();
       return { id: user.id, email: user.email, onboardedAt: user.onboardedAt, isDemo: user.isDemo };
-    } catch {
+    };
+    try {
+      return await attempt();
+    } catch (e) {
+      /* 401·403은 진짜 세션 없음이다. 연결 끊김·5xx는 부팅 순간의 출렁임일 수 있어
+         한 번만 다시 물어본다 — refresh 쿠키가 멀쩡한데 로그인 화면에 떨어지지 않게 */
+      if (!isApiError(e) || e.status >= 500) {
+        await new Promise((r) => setTimeout(r, 1000));
+        try {
+          return await attempt();
+        } catch {
+          /* 두 번 다 안 되면 포기하고 로그인으로 보낸다 */
+        }
+      }
       setToken(null);
       return null;
     }

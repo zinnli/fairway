@@ -103,7 +103,16 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   if (res.status === 204) return undefined as T;
 
   const text = await res.text();
-  const data: unknown = text ? JSON.parse(text) : null;
+  /* 프록시가 낀 502처럼 JSON이 아닌 몸통이 올 수 있다 — SyntaxError를 규격 밖으로
+     흘리지 않는다. 오류 응답이면 parseErrorBody가 기본 문구로 채운다 */
+  let data: unknown = null;
+  if (text) {
+    try {
+      data = JSON.parse(text);
+    } catch {
+      if (res.ok) throw new NetworkError();
+    }
+  }
 
   if (!res.ok) throw new ApiError(res.status, parseErrorBody(res.status, data));
   return data as T;
