@@ -375,7 +375,9 @@ export function CaseWorkspacePage() {
         await service.sendRebuttal(caseId);
         setConfirmSend(null);
         setDrawer(null);
-        await refresh();
+        /* 발송은 이미 성공했다 — 여기서 새로 고침이 실패해도 h36(발송 실패)으로
+           이어지면 재발송을 유도하게 된다. 최신 상태는 이벤트가 마저 맞춘다 */
+        await refresh().catch(() => {});
       } catch (e) {
         /* 쓴 내용과 첨부는 그대로 두고 확인 창으로 돌려보낸다 (h36) */
         showFailure(e, () => {
