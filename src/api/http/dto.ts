@@ -318,7 +318,6 @@ export interface SendResultDto {
   attachmentCount: number;
 }
 
-
 /* ── 공통 목록 봉투 ───────────────────────────────────────────────────── */
 
 export interface ListDto<T> {

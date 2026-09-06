@@ -10,6 +10,7 @@
 pnpm install     # 처음 한 번
 pnpm dev         # http://localhost:5173 — 첫 화면(S0)이 뜬다
                  # 부품 확인 페이지는 /design-system (개발 서버에서만 열린다)
+pnpm dev:api     # 개발 서버 + 목 백엔드. 진짜 HTTP로 답해 네트워크 탭에 다 찍힌다
 pnpm build       # tsc -b && vite build
 pnpm lint        # oxlint
 pnpm fonts:sync  # Pretendard를 node_modules에서 public/으로 다시 복사할 때만
@@ -48,11 +49,13 @@ corepack이 켜져 있으면 자동으로 맞는 버전이 쓰인다.
 
 ## 백엔드 연동
 
-`.env.local`에 두 줄을 넣으면 서버로 붙는다.
+`.env.local`에 아래를 넣으면 서버로 붙는다. 개발 서버에서는 상대 주소로 두고
+`DEV_API_PROXY`로 중계한다 — 같은 출처여야 refresh 쿠키가 따라온다.
 
 ```bash
 VITE_API=http
-VITE_API_BASE=https://<api 주소>/api/v1     # 끝에 /api/v1 까지, 슬래시로 끝내지 않는다
+VITE_API_BASE=/api/v1                      # 개발 서버. 배포에는 https://<api 주소>/api/v1
+DEV_API_PROXY=https://<api 주소>            # 개발 서버가 중계할 곳 (배포에는 없다)
 ```
 
 > **`VITE_API`를 안 넣으면 아무 소리 없이 목으로 돈다** (`src/api/index.ts`).

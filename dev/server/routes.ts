@@ -749,7 +749,8 @@ export const routes: Route[] = [
     method: 'GET',
     path: '/cases/:caseId/events',
     raw: true,
-    /* EventSource는 헤더를 못 붙여서 토큰이 쿼리로 온다 — 여기서 직접 본다 */
+    /* EventSource는 헤더를 못 붙여서 토큰이 쿼리로 온다(sse.ts). 목은 그 토큰을
+       검사하지 않고 열어 준다 — 진짜 서버가 쿼리 토큰을 받는지는 여기서 알 수 없다 */
     anonymous: true,
     handler: ({ params, req, res }) => {
       must(params.caseId);
