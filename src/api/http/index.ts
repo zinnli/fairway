@@ -285,6 +285,7 @@ export const httpService: CaseService = {
       },
       caseUpdated: (c) => on.caseUpdated?.(caseWithRatio(c), toActiveJob(c.activeJob)),
       rebuttalSent: (d) => on.rebuttalSent?.(d.sentAt, d.recipient),
+      regained: () => on.regained?.(),
       lost: () => on.lost?.(),
     }),
 };

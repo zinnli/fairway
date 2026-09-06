@@ -516,6 +516,32 @@ export function CaseWorkspacePage() {
             setActiveJob(activeJobNow);
             void reloadList();
           },
+          /* 끊겼다 새로 붙었다 — 그 사이 이벤트는 재전송되지 않는다(sse.ts). 사건과
+             대화를 다시 읽어 맞춘다. 채널은 살아 있으니 Job과 잠금은 건드리지 않는다 */
+          regained: () => {
+            dropReplyCard();
+            refresh().catch(() => {});
+            service
+              .listMessages(caseId)
+              .then((again) => {
+                if (activeCase.current !== caseId || !again.length) return;
+                dispatch({ type: 'reset', messages: again });
+                /* reset이 로컬 로딩 카드를 지웠다 — Job이 아직 돌면 같은 id로 도로 세운다 */
+                if (loadingCardId.current !== null && loadingPhase.current !== null) {
+                  dispatch({
+                    type: 'append',
+                    message: {
+                      id: loadingCardId.current,
+                      at: now(),
+                      role: 'ai',
+                      kind: 'analyzing',
+                      phase: loadingPhase.current,
+                    },
+                  });
+                }
+              })
+              .catch(() => {});
+          },
           /* 채널이 끊겼고 되살리지 못했다 — 사건과 대화를 다시 읽어 맞춘다.
              Job이 돌고 있어도 끝났다는 이벤트는 이제 못 받으므로 activeJob을
              내린다 — 안 내리면 로딩 카드와 입력 잠금이 사건을 떠날 때까지 안 풀린다 */

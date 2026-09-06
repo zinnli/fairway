@@ -24,6 +24,8 @@ export interface CaseEvents {
   /** 사건이 바뀌었다. 사이드바 배지·현황판·로딩 표시를 이걸로 맞춘다 */
   caseUpdated?: (item: Case, activeJob: ActiveJob | null) => void;
   rebuttalSent?: (at: string, to: string) => void;
+  /** 채널이 끊겼다 새로 붙었다 — 그 사이 이벤트는 안 오므로 화면이 다시 읽어 맞춘다 */
+  regained?: () => void;
   /** 채널이 끊겼고 되살리지 못했다 — 화면이 사건과 대화를 다시 읽는다 */
   lost?: () => void;
 }
