@@ -403,8 +403,11 @@ export function CaseWorkspacePage() {
     async (draft: Rebuttal) => {
       setSending(true);
       try {
-        /* 보내기 전 고친 내용을 먼저 저장하고, 최종 내용은 서버가 읽는다 */
-        await service.updateRebuttal(caseId, draft);
+        /* 보내기 전 고친 내용을 먼저 저장하고, 최종 내용은 서버가 읽는다.
+           제목은 빼고 보낸다 — 서버가 접수번호로 만드는 값이라(G-2 subjectAuto)
+           화면이 만든 문장을 얹으면 서버가 "사용자가 직접 고쳤다"로 보고 자동 갱신을 멈춘다 */
+        const { subject: _serverMakesIt, ...patch } = draft;
+        await service.updateRebuttal(caseId, patch);
         await service.sendRebuttal(caseId);
         setConfirmSend(null);
         setDrawer(null);
