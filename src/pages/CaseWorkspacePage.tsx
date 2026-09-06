@@ -557,6 +557,16 @@ export function CaseWorkspacePage() {
   const rewriting = activeJob?.kind === 'report';
 
   /**
+   * 분석·판정이 도는 동안은 **입력 바를 잠근다** (명세 §5 activeJob).
+   * 서류 작업(report·rebuttal)은 잠그지 않는다 — 그건 단추만 잠긴다.
+   *
+   * 결과를 아직 못 본 채로 한 말은 맥락이 어긋나고, 답 대기 카드가 로딩 카드 옆에
+   * 하나 더 서게 된다. 무엇을 기다리는지에 따라 안내 글자도 갈아 끼운다.
+   */
+  const waitingFor =
+    activeJob?.kind === 'analysis' || activeJob?.kind === 'verdict' ? activeJob.kind : null;
+
+  /**
    * PDF — 서버가 만들어 준다. 목은 인쇄 CSS로 대신한다.
    * 어느 쪽이든 html2canvas는 쓰지 않는다 (한글이 이미지로 뭉개진다).
    */
@@ -808,10 +818,15 @@ export function CaseWorkspacePage() {
         <Composer
           onSend={(text) => void sendText(text)}
           onPickVideo={pickVideo}
+          disabled={waitingFor !== null}
           placeholder={
-            chat.messages.some((m) => m.role === 'user')
-              ? '메시지를 입력하세요'
-              : '사고 상황을 설명해 주세요'
+            waitingFor === 'analysis'
+              ? '영상을 다 본 뒤에 이어서 말씀해 주세요'
+              : waitingFor === 'verdict'
+                ? '판정이 끝나면 이어서 말씀해 주세요'
+                : chat.messages.some((m) => m.role === 'user')
+                  ? '메시지를 입력하세요'
+                  : '사고 상황을 설명해 주세요'
           }
         />
       </div>
