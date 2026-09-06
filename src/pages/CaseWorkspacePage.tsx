@@ -728,11 +728,22 @@ export function CaseWorkspacePage() {
   const rebuttalExists = rebuttal !== null;
   /* 보냈는지는 발송 카드로 안다 — 초안 카드의 sentAt은 서버가 늘 null로 준다 (map.ts) */
   const rebuttalSent = lastOf('sent') !== null || rebuttal?.sentAt != null;
-  /* 참고용 고지는 화면당 한 번(규칙 0.2). 판정·경위서 카드가 이미 달고 나온다 */
+  /**
+   * 참고용 고지는 화면당 한 번(규칙 0.2). **자리는 고정이 아니다.**
+   *
+   * 시안을 전 화면 훑어보면 자리가 둘로 갈린다 — 대화 맨 끝이 판정 카드(h21·h21b)나
+   * 경위서 초안 카드(h26)이면 그 카드가 달고 나오고, 그 밖에는 전부 현황판 하단이다
+   * (h12~h20 · h27 · h28 · h29). 반박의견서 초안·발송 카드는 달지 않는다.
+   *
+   * **맨 끝일 때만이다.** 로그 어디서든 판정 카드를 찾아 달면, 판정 뒤로 대화가
+   * 이어졌을 때 고지가 위로 흘러가 화면에서 사라진다 — 현황판도 "이미 달렸다"고
+   * 보고 비워 두기 때문이다.
+   */
+  const lastCard = chat.messages.at(-1) ?? null;
   const disclaimerCardId =
-    [...chat.messages]
-      .reverse()
-      .find((m) => m.kind === 'verdict' || m.kind === 'statementDraft')?.id ?? null;
+    lastCard && (lastCard.kind === 'verdict' || lastCard.kind === 'statementDraft')
+      ? lastCard.id
+      : null;
 
   /**
    * [영상 올리기]가 설 자리 — 화면 전체에서 딱 하나다.
