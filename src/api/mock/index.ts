@@ -48,6 +48,11 @@ const newCaseId = () =>
   `case-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 4)}`;
 const newMessageId = () => `m-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
 const now = () => new Date().toISOString();
+/* 서버가 F-3에서 만들어 주는 날짜 문구("08-25"). 목이 서버 노릇을 하니 목이 만든다 */
+const dateLabel = () => {
+  const d = new Date();
+  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+};
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 function loadDemo() {
@@ -438,7 +443,7 @@ export const mockService: CaseService = {
     void (async () => {
       await wait(900);
       if (!find(caseId)) return;
-      const doc = { ...DEMO_STATEMENT, updatedAt: now() };
+      const doc = { ...DEMO_STATEMENT, dateLabel: dateLabel() };
       c.stages = { ...c.stages, statement: '완료' };
       push(caseId, { role: 'ai', kind: 'statementDraft', doc });
       setJob(caseId, null);
@@ -455,7 +460,7 @@ export const mockService: CaseService = {
       push(caseId, {
         role: 'ai',
         kind: 'statementDraft',
-        doc: { ...before, version: before.version + 1, updatedAt: now() },
+        doc: { ...before, version: before.version + 1, dateLabel: dateLabel() },
       });
       setJob(caseId, null);
     })();

@@ -17,11 +17,6 @@ import { versionLabel } from '@/lib/document';
  * PDF는 html2canvas로 만들지 않는다 — 한글이 이미지로 뭉개진다.
  * 인쇄 CSS + window.print()를 쓰고, 인쇄용 본문은 작업 화면이 따로 들고 있다.
  */
-function monthDay(iso: string) {
-  const d = new Date(iso);
-  return `${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 /** 머리글의 알약 배지 */
 function Pill({ children }: { children: React.ReactNode }) {
   return (
@@ -70,7 +65,7 @@ export function StatementDialog({
         doc && (
           <span className="flex min-w-0 shrink items-center gap-1 overflow-hidden">
             <Pill>{versionLabel(doc.version)}</Pill>
-            <Pill>{monthDay(doc.updatedAt)}</Pill>
+            {doc.dateLabel && <Pill>{doc.dateLabel}</Pill>}
           </span>
         )
       }

@@ -164,7 +164,7 @@ export const toStatement = (r: ReportFullDto): Statement => ({
   version: r.version,
   sections: r.sections.map((s) => ({ title: s.title, body: s.body })),
   pageCount: r.pageCount,
-  updatedAt: new Date().toISOString(),
+  dateLabel: r.dateLabel,
 });
 
 export const toRebuttal = (r: RebuttalDto): Rebuttal => ({
@@ -242,7 +242,8 @@ export function toMessage(m: MessageDto): ChatMessage | null {
           /* 카드에는 미리보기 문장만 온다. 전문(sections)은 F-3으로 따로 받는다 */
           preview: p.preview,
           sections: [],
-          updatedAt: m.createdAt,
+          /* 카드 payload에는 날짜가 없다. 전문(F-3)을 열 때 서버가 준다 */
+          dateLabel: null,
         },
       };
     }

@@ -13,7 +13,14 @@ export interface Statement {
   pageCount: number;
   /** 카드에 보여 줄 미리보기 줄. 서버가 문장으로 준다 — 없으면 sections에서 만든다 */
   preview?: string[];
-  updatedAt: string;
+  /**
+   * 머리글 알약에 그대로 찍는 날짜 문구 — "08-25" (명세 F-3 `dateLabel`).
+   * **화면이 시각에서 만들지 않는다.** 만들면 언제 열든 오늘 날짜가 되어,
+   * 어제 쓴 경위서를 오늘 열었을 때 없는 날짜를 보여 준다.
+   *
+   * 초안 카드 payload(§4.7)에는 이 값이 없다 — 날짜는 전문(h30)에만 보인다. 그때는 null이다.
+   */
+  dateLabel: string | null;
 }
 
 /** 반박의견서 — 02 기능명세서 4장 */

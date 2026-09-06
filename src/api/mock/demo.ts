@@ -164,7 +164,7 @@ export const DEMO_STATEMENT: Statement = {
   /* 위 네 절이 11pt·여백 18/16mm에서 한 장에 들어간다.
      명세 예시가 2로 적혀 있지만 그건 같은 본문에 붙은 자리표시자 값이다 */
   pageCount: 1,
-  updatedAt: '2026-08-25T10:10:00+09:00',
+  dateLabel: '08-25',
 };
 
 /** 반박의견서 — 보낸 뒤 상태 (h34 본문·첨부) */
