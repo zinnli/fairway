@@ -8,7 +8,7 @@ import { RebuttalDialog } from '@/features/documents/RebuttalDialog';
 import { PrecedentDialog, ProcessDialog } from '@/features/workspace/dialogs/GroundDialogs';
 import { ErrorDialog, SendConfirmDialog } from '@/features/workspace/dialogs/AlertDialogs';
 import { VideoDialog } from '@/features/workspace/dialogs/VideoDialog';
-import { sampleVideoUrl, VIDEO_LIMITS } from '@/config';
+import { DISCLAIMER, sampleVideoUrl, VIDEO_LIMITS } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
 import type { ChatMessage, MessageBody } from '@/domain/message';
 import type { Precedent, PrecedentDetail } from '@/domain/verdict';
@@ -987,6 +987,11 @@ export function CaseWorkspacePage() {
                 }}
               />
             ))}
+            {/* 좁은 화면에서는 현황판이 서랍이라, 카드가 고지를 달지 않으면 어디에도 안 보인다.
+                1024 이상에서는 현황판이 달고 있으므로 감춘다 (화면당 한 번 · 규칙 0.2) */}
+            {disclaimerCardId === null && (
+              <p className="w-full text-[12.5px] leading-[1.5] text-muted lg:hidden">{DISCLAIMER}</p>
+            )}
             <div ref={bottomRef} />
           </div>
         </div>
