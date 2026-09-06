@@ -59,16 +59,19 @@ export function authorize(req: IncomingMessage) {
 
 const session = (token: string) => ({ user: USER, accessToken: token, expiresIn: ACCESS_TTL_SEC });
 
-/** refresh 쿠키 — 같은 출처(개발 프록시)라 SameSite=Lax로도 따라온다 */
+/** refresh 쿠키 — 같은 출처(개발 프록시)라 SameSite=Lax로도 따라온다.
+ * **이름을 실서버(refresh_token)와 다르게 둔다.** 같으면 목으로 로그인한 브라우저에
+ * 찌꺼기가 남고, 뒤에 실서버로 붙였을 때 두 쿠키가 함께 실리는데 서버가 뒤의 값을
+ * 읽어 진짜 토큰을 덮는다 — 새로고침마다 로그인이 풀렸다 (9/7). */
 function setRefreshCookie(ctxRes: { setHeader: (k: string, v: string) => void }) {
   ctxRes.setHeader(
     'Set-Cookie',
-    `refresh_token=devmock-refresh; Path=/api/v1; HttpOnly; SameSite=Lax; Max-Age=1209600`,
+    `devmock_refresh=1; Path=/api/v1; HttpOnly; SameSite=Lax; Max-Age=1209600`,
   );
 }
 
 function hasRefreshCookie(req: IncomingMessage) {
-  return (req.headers.cookie ?? '').includes('refresh_token=');
+  return (req.headers.cookie ?? '').includes('devmock_refresh=');
 }
 
 /* ── 카드 ──────────────────────────────────────────────────────────────── */
@@ -229,7 +232,7 @@ export const routes: Route[] = [
     status: 204,
     handler: ({ res }) => {
       tokens.clear();
-      res.setHeader('Set-Cookie', 'refresh_token=; Path=/api/v1; Max-Age=0');
+      res.setHeader('Set-Cookie', 'devmock_refresh=; Path=/api/v1; Max-Age=0');
       return undefined;
     },
   },
