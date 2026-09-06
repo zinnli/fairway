@@ -1,9 +1,11 @@
 import { Dots } from '@/components/ui/Dots';
 import { Button } from '@/components/ui/Button';
-import { DISCLAIMER } from '@/config';
+import { Icon } from '@/components/ui/Icon';
+import { DISCLAIMER, REQUIRE_CLAIM_NO } from '@/config';
 import type { Rebuttal, Statement } from '@/domain/document';
 import { versionLabel } from '@/lib/document';
 import { AiMessage, AiNote, AiText } from './AiMessage';
+import { CardHeader, FieldRow, MessageCard, Pill } from './MessageCard';
 
 function timeLabel(iso: string) {
   const d = new Date(iso);
@@ -13,7 +15,11 @@ function timeLabel(iso: string) {
 
 /**
  * 사건경위서 초안 — h26 (h28의 서류 카드도 같은 부품이다).
- * 9/3 축소로 "대화 N건 반영"과 쟁점 캡션이 빠졌다 (04 문서 C8·C9).
+ *
+ * 말풍선이 아니라 **흰 카드**다 — 단추까지 카드 안에 들어간다 (시안 h26 · h28).
+ * 버전과 장수는 머리글 오른쪽 알약으로 붙는다.
+ *
+ * 9/3 축소로 "대화 N건 반영"과 쟁점 캡션이 빠졌다 (04 문서 C8·C9 — 되살리지 않았다).
  * [다시 쓰기]는 9/4에 되살렸다 — 누르면 새 버전 카드가 아래에 하나 더 붙는다.
  */
 export function StatementDraftCard({
@@ -38,18 +44,21 @@ export function StatementDraftCard({
   withDisclaimer?: boolean;
 }) {
   return (
-    <AiMessage className="gap-3">
-      <div className="flex flex-wrap items-baseline gap-2">
-        <p className="text-[15px] font-semibold text-ink">사건경위서 초안이 준비됐어요</p>
-        <p className="text-[12.5px] font-medium text-muted">
-          {versionLabel(doc.version)}
-          {/* 장수는 서버가 만든 PDF를 세어 준 값이다. 못 받으면 지어내지 않고 숨긴다 */}
-          {doc.pageCount > 0 && ` · ${doc.pageCount}장`}
-        </p>
-      </div>
+    <MessageCard>
+      <CardHeader
+        icon="file"
+        title="사건경위서 초안이 준비됐어요"
+        badge={
+          <Pill>
+            {versionLabel(doc.version)}
+            {/* 장수는 서버가 만든 PDF를 세어 준 값이다. 못 받으면 지어내지 않고 숨긴다 */}
+            {doc.pageCount > 0 && ` · ${doc.pageCount}장`}
+          </Pill>
+        }
+      />
 
       {/* 서버는 미리보기를 문장으로 준다. 목처럼 전문을 들고 있을 때만 우리가 만든다 */}
-      <div className="flex flex-col gap-2 rounded-md border border-line-2 bg-surface p-4">
+      <div className="flex flex-col gap-2 rounded-md border border-line-2 bg-bg-3 p-4">
         {(doc.preview ??
           doc.sections
             .slice(0, 2)
@@ -98,32 +107,103 @@ export function StatementDraftCard({
         </Button>
       )}
 
-      {withDisclaimer && (
-        <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>
-      )}
-    </AiMessage>
+      {withDisclaimer && <p className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</p>}
+    </MessageCard>
   );
 }
 
-/** 반박의견서 초안 — h33 */
-export function RebuttalDraftCard({ doc, onOpen }: { doc: Rebuttal; onOpen: () => void }) {
-  const attached = doc.attachments.filter((a) => a.included).length;
+/** 아직 못 채운 칸 — 모래빛 점 + 글자 (11_DesignSystem "확인 필요") */
+function Missing({ children }: { children: React.ReactNode }) {
   return (
-    <AiMessage className="gap-3">
-      <p className="text-[15px] font-semibold text-ink">반박의견서 초안이 준비됐어요</p>
-      <div className="flex flex-col gap-1 rounded-md border border-line-2 bg-surface p-4 text-[13.5px] leading-[1.6]">
-        <p className="text-ink-3">
-          받는이 <span className="text-ink">{doc.to}</span>
-        </p>
-        <p className="text-ink-3">
-          제목 <span className="text-ink">{doc.subject}</span>
-        </p>
-        <p className="text-muted">첨부 {attached}개</p>
-      </div>
-      <Button className="self-start" onClick={onOpen}>
-        열어 보기
+    <span className="inline-flex items-center gap-1">
+      <span className="size-1.5 shrink-0 rounded-full bg-sand" aria-hidden />
+      <span className="text-sand-text">{children}</span>
+    </span>
+  );
+}
+
+/** 첨부 알약 — 여기서는 보여 주기만 한다. 빼는 것은 다음 창(S6)에서 한다 */
+function AttachmentChip({ label }: { label: string }) {
+  return (
+    <span className="box-border inline-flex min-h-7 items-center gap-1 rounded-full border border-line bg-surface px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2">
+      <span className="flex shrink-0 text-muted" aria-hidden>
+        <Icon name="file" size={12} />
+      </span>
+      <span className="min-w-0 truncate">{label}</span>
+    </span>
+  );
+}
+
+/** 공백만 든 칸은 안 넣은 것으로 본다 — 그래야 "아직 …" 자리가 제대로 선다 */
+const trimmed = (v: string | null | undefined) => (v ?? '').trim();
+
+/**
+ * 반박의견서 초안 — h28.
+ *
+ * 카드에서 **보낼 내용을 미리 다 보여 준다** — 받는이·접수번호·제목·첨부·본문 첫 줄.
+ * 열어 보기 전에도 무엇이 나가는지 알 수 있어야 하고, 아직 못 채운 칸이
+ * 무엇인지도 여기서 드러나야 한다 (모래빛 = 확인 필요).
+ *
+ * 첨부 알약에 ×를 붙이지 않는다. 빼는 것은 다음 창(S6)이 하는 일이라,
+ * 여기 ×는 눌리지 않는 단추가 된다. 대신 어디서 뺄 수 있는지 글로 알린다.
+ */
+export function RebuttalDraftCard({ doc, onOpen }: { doc: Rebuttal; onOpen: () => void }) {
+  const to = trimmed(doc.to);
+  const claimNo = trimmed(doc.claimNo);
+  const attached = doc.attachments.filter((a) => a.included);
+  /* 서버가 접수번호로 제목을 만든다(G-2 subjectAuto) — 아직 없으면 제목도 덜 된 것이다 */
+  const claimNoNeeded = REQUIRE_CLAIM_NO && !claimNo;
+
+  return (
+    <MessageCard>
+      <CardHeader icon="file" title="반박의견서 초안이 준비됐어요" />
+
+      <FieldRow label="받는이">
+        {to ? <span className="text-ink">{to}</span> : <span className="text-muted">아직 안 정했어요</span>}
+      </FieldRow>
+
+      <FieldRow label="접수번호" align={claimNo ? 'baseline' : 'start'}>
+        {claimNo ? (
+          <span className="tnum text-ink">{claimNo}</span>
+        ) : (
+          <>
+            <Missing>아직 안 넣었어요</Missing>
+            <span className="text-[12.5px] leading-[1.5] text-muted">
+              보험사 접수 문자나 메일에 있어요 · 이걸 넣어야 보험사가 사건을 찾을 수 있어요
+            </span>
+          </>
+        )}
+      </FieldRow>
+
+      <FieldRow label="제목">
+        <span className="text-ink">
+          {doc.subject}
+          {claimNoNeeded && <span className="text-sand-text"> (접수번호는 아직 안 넣었어요)</span>}
+        </span>
+      </FieldRow>
+
+      {attached.length > 0 && (
+        <FieldRow label="첨부" align="start">
+          <span className="flex flex-wrap gap-2">
+            {attached.map((a) => (
+              <AttachmentChip key={a.id} label={a.label} />
+            ))}
+          </span>
+          <span className="text-[12.5px] leading-[1.5] text-muted">
+            영상에는 다른 차량 번호판이 담길 수 있어요 · 다음 창에서 ×로 뺄 수 있어요
+          </span>
+        </FieldRow>
+      )}
+
+      {/* 본문 첫 줄 — 서버가 준 글을 그대로 따온다. 지어내지 않는다 */}
+      <p className="text-[14px] leading-[1.6] text-ink-3">
+        “{doc.body.trim().split('\n')[0].slice(0, 90)}…”
+      </p>
+
+      <Button size="lg" className="self-start" onClick={onOpen}>
+        반박의견서 확인하고 보내기
       </Button>
-    </AiMessage>
+    </MessageCard>
   );
 }
 
