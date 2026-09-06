@@ -32,6 +32,8 @@ export interface MessageActions {
   onCreateRebuttal: () => void;
   /** 반박의견서 초안이 이미 있는가 — 있으면 [반박의견서 만들기]를 내린다 */
   rebuttalExists?: boolean;
+  /** 이미 보냈는가 — 초안 카드의 단추 문구가 [확인하기]로 바뀐다 */
+  rebuttalSent?: boolean;
   onOpenRebuttal: () => void;
   onOpenProcess: () => void;
   onOpenVideo: (video: VideoRef) => void;
@@ -147,7 +149,13 @@ export function MessageItem({
       );
 
     case 'rebuttalDraft':
-      return <RebuttalDraftCard doc={message.doc} onOpen={actions.onOpenRebuttal} />;
+      return (
+        <RebuttalDraftCard
+          doc={message.doc}
+          onOpen={actions.onOpenRebuttal}
+          sent={actions.rebuttalSent}
+        />
+      );
 
     case 'sent':
       return <SentCard at={message.at} to={message.to} attachmentCount={message.attachmentCount} />;

@@ -646,6 +646,8 @@ export function CaseWorkspacePage() {
   /* 만들기 단추를 내리는 기준은 셋 다 같다 — **초안 카드가 대화에 붙었는가**.
      보낸 뒤에도 초안 카드는 로그에 남으므로 그대로 내려가 있다 */
   const rebuttalExists = rebuttal !== null;
+  /* 보냈는지는 발송 카드로 안다 — 초안 카드의 sentAt은 서버가 늘 null로 준다 (map.ts) */
+  const rebuttalSent = lastOf('sent') !== null || rebuttal?.sentAt != null;
   /* 참고용 고지는 화면당 한 번(규칙 0.2). 판정·경위서 카드가 이미 달고 나온다 */
   const disclaimerCardId =
     [...chat.messages]
@@ -791,6 +793,7 @@ export function CaseWorkspacePage() {
                   statementRewriting: rewriting,
                   onCreateRebuttal: () => void createRebuttal(),
                   rebuttalExists,
+                  rebuttalSent,
                   onOpenRebuttal: () => void openRebuttal(),
                   onOpenProcess: () => pop('process'),
                   onOpenVideo: (video) => void openVideo(video),

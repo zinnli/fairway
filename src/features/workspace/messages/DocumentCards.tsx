@@ -147,7 +147,19 @@ const trimmed = (v: string | null | undefined) => (v ?? '').trim();
  * 첨부 알약에 ×를 붙이지 않는다. 빼는 것은 다음 창(S6)이 하는 일이라,
  * 여기 ×는 눌리지 않는 단추가 된다. 대신 어디서 뺄 수 있는지 글로 알린다.
  */
-export function RebuttalDraftCard({ doc, onOpen }: { doc: Rebuttal; onOpen: () => void }) {
+export function RebuttalDraftCard({
+  doc,
+  onOpen,
+  sent,
+}: {
+  doc: Rebuttal;
+  onOpen: () => void;
+  /**
+   * 이미 보냈는가. **카드의 `doc.sentAt`으로는 알 수 없다** — 서버가 주는 카드는
+   * 보내기 전 모습 그대로라 늘 null이다(map.ts). 작업 화면이 발송 카드를 보고 알려 준다.
+   */
+  sent?: boolean;
+}) {
   const to = trimmed(doc.to);
   const claimNo = trimmed(doc.claimNo);
   const attached = doc.attachments.filter((a) => a.included);
@@ -200,8 +212,9 @@ export function RebuttalDraftCard({ doc, onOpen }: { doc: Rebuttal; onOpen: () =
         “{doc.body.trim().split('\n')[0].slice(0, 90)}…”
       </p>
 
+      {/* 보내고 나면 더 보낼 것이 없다 — 단추는 남기되 하는 일만큼만 말한다 */}
       <Button size="lg" className="self-start" onClick={onOpen}>
-        반박의견서 확인하고 보내기
+        {sent ? '반박의견서 확인하기' : '반박의견서 확인하고 보내기'}
       </Button>
     </MessageCard>
   );
