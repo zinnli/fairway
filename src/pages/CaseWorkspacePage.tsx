@@ -127,6 +127,9 @@ export function CaseWorkspacePage() {
   const pickVideo = () => fileRef.current?.click();
 
   const reloadList = useCaseStore((s) => s.load);
+  /* 사이드바에서 이름을 바꾸면 목록은 곧바로 다시 읽힌다(store.rename) — 머리글 제목은
+     getCase·SSE로만 갱신돼 그대로 남았다. 목록의 제목을 정본으로 끌어와 맞춘다 */
+  const listTitle = useCaseStore((s) => s.list.find((c) => c.id === caseId)?.title ?? null);
   /* 콜백 안에서 최신 대화를 봐야 해서 거울을 하나 둔다 */
   const messagesRef = useRef(chat.messages);
   /**
@@ -789,7 +792,13 @@ export function CaseWorkspacePage() {
     };
   }, []);
 
-  const item = loaded?.id === caseId ? loaded.item : null;
+  const loadedItem = loaded?.id === caseId ? loaded.item : null;
+  /* 이름이 목록과 어긋나면 목록 쪽을 따른다 — 바꾼 직후의 머리글이 즉시 새 이름이 되게.
+     상태를 고치지 않고 그리는 시점에 갈아 끼운다. 다음 getCase·case.updated가 맞춰 온다 */
+  const item =
+    loadedItem && listTitle !== null && loadedItem.title !== listTitle
+      ? { ...loadedItem, title: listTitle }
+      : loadedItem;
 
   /* 서류는 사건이 아니라 대화에 실려 온다. 마지막 것이 지금 것이다 */
   const lastOf = <K extends ChatMessage['kind']>(kind: K) =>
