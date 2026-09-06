@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Dialog } from '@/components/ui/Dialog';
 import { Dots } from '@/components/ui/Dots';
 import { Icon } from '@/components/ui/Icon';
 import { DISCLAIMER } from '@/config';
 import type { Statement } from '@/domain/document';
+import { cn } from '@/lib/cn';
 import { versionLabel } from '@/lib/document';
 
 /**
@@ -18,9 +19,14 @@ import { versionLabel } from '@/lib/document';
  * 인쇄 CSS + window.print()를 쓰고, 인쇄용 본문은 작업 화면이 따로 들고 있다.
  */
 /** 머리글의 알약 배지 */
-function Pill({ children }: { children: React.ReactNode }) {
+function Pill({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span className="box-border shrink-0 rounded-full border border-line bg-surface px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2">
+    <span
+      className={cn(
+        'box-border shrink-0 rounded-full border border-line bg-surface px-2 py-1 text-[12px] leading-[1.35] font-medium text-ink-2',
+        className,
+      )}
+    >
       {children}
     </span>
   );
@@ -43,6 +49,7 @@ export function StatementDialog({
   rewriting?: boolean;
 }) {
   const [instruction, setInstruction] = useState('');
+  const hintId = useId();
   /* 보낸 요청은 그 자리에서 지운다 — 같은 요청이 두 번 나가지 않게 */
   const rewrite = () => {
     onRewrite(instruction.trim());
@@ -66,6 +73,13 @@ export function StatementDialog({
           <span className="flex min-w-0 shrink items-center gap-1 overflow-hidden">
             <Pill>{versionLabel(doc.version)}</Pill>
             {doc.dateLabel && <Pill>{doc.dateLabel}</Pill>}
+            {/*
+              쪽수는 문서에 딸린 값이라 버전·날짜와 나란히 둔다. 바닥에 두면 회색 문장
+              사이에 숫자가 끼어 무엇이 무슨 말인지 흐려진다 (시안 h30의 알약은 셋이었고
+              그중 하나가 9/3에 빠져 자리가 비어 있다).
+              좁은 화면에서는 제목과 알약이 서로 밀어내므로 뺀다 — 대화의 초안 카드에 같은 값이 있다.
+            */}
+            {doc.pageCount > 0 && <Pill className="max-sm:hidden">{doc.pageCount}쪽</Pill>}
           </span>
         )
       }
@@ -80,6 +94,7 @@ export function StatementDialog({
                 disabled={rewriting}
                 placeholder="예: 2번을 더 간단하게"
                 aria-label="다시 쓸 때 반영할 요청"
+                aria-describedby={hintId}
                 className="h-11 min-w-0 flex-1 rounded-md border border-line bg-surface px-4 text-[14px] text-ink placeholder:text-muted focus:outline-none disabled:bg-bg-2 disabled:text-disabled"
               />
               <Button variant="secondary" onClick={rewrite} disabled={rewriting}>
@@ -97,18 +112,25 @@ export function StatementDialog({
                 PDF 받기
               </Button>
             </div>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              {/*
-                시안 h30은 `1 / 2쪽`이라고 적어 뒀지만 쪽을 넘기는 장치가 없다 —
-                같은 화면의 핸드오프 주석대로 본문은 한 줄기로 이어지고 이 칸만 스크롤한다.
-                그래서 `1 /`은 늘 1이고, 없는 조작이 있는 것처럼 읽힌다. 숫자만 남긴다.
-                (장수 자체는 서버가 만든 PDF를 센 값이다 — 못 받으면 지어내지 않고 숨긴다)
-              */}
-              {doc.pageCount > 0 && (
-                <span className="tnum text-[12.5px] text-muted">{doc.pageCount}쪽</span>
-              )}
-              <span className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</span>
-            </div>
+
+            {/*
+              적어 봐야 반영되지 않는 요청이 있다는 걸 알린다 (9/6 시연 피드백).
+              "제 속도는 45km였습니다"처럼 영상에서 확인된 사실과 어긋나는 주장은
+              경위서에 들어가지 않는데, 그걸 모르면 다시 쓰기가 고장 난 것처럼 보인다.
+
+              모래빛으로 칠한다 — 아래 참고용 고지와 같은 회색으로 두면 12.5px 문장 둘이
+              한 덩어리로 뭉쳐 무엇이 무슨 말인지 구분되지 않는다. 모래빛 점 + 모래빛 글자는
+              화면 곳곳에서 "확인 필요"를 가리키는 짝이라(11_DesignSystem) 뜻도 맞는다.
+            */}
+            <p id={hintId} className="flex items-center gap-1 text-[12.5px] leading-[1.5]">
+              {/* 6px 색점은 간격 규칙(4의 배수)의 정해진 예외다 — 화면 곳곳의 "확인 필요"와 같은 짝 */}
+              <span className="size-1.5 shrink-0 rounded-full bg-sand" aria-hidden />
+              <span className="min-w-0 text-sand-text">
+                블랙박스 내용과 어긋나는 주관적인 의견은 경위서에 반영되지 않아요.
+              </span>
+            </p>
+
+            <span className="text-[12.5px] leading-[1.5] text-muted">{DISCLAIMER}</span>
           </div>
         )
       }
