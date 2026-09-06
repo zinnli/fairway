@@ -8,7 +8,8 @@
 ## 명령어
 
 ```bash
-pnpm dev      # 개발 서버
+pnpm dev      # 개발 서버 (.env.local 을 따른다 — 보통 브라우저 목)
+pnpm dev:api  # 개발 서버 + 목 백엔드. 진짜 HTTP로 답해서 네트워크 탭에 다 찍힌다
 pnpm build    # tsc -b && vite build
 pnpm lint     # oxlint
 ```
@@ -139,6 +140,20 @@ src/
 
 목이 서버와 **같은 계약**(`src/api/service.ts`)을 브라우저 안에서 구현한다 — 화면은 둘을 구분하지 못한다.
 `VITE_API=mock`으로 배포하면 백엔드 없이도 전 구간이 돈다. MSW·Dexie는 쓰지 않는다(목은 메모리라 새로고침하면 시드로 돌아간다).
+
+**목이 둘이다 — 쓰는 자리가 다르다.**
+
+| | `src/api/mock/` 브라우저 목 | `dev/` 개발 서버 목 API |
+|---|---|---|
+| 켜는 법 | `pnpm dev` (`VITE_API=mock`) | `pnpm dev:api` (env를 안 고쳐도 된다) |
+| 무엇을 답하나 | 서비스 인터페이스(도메인 타입) | 진짜 HTTP(명세의 DTO·오류 봉투·SSE) |
+| 네트워크 탭 | 아무것도 안 찍힌다 | 요청·헤더·본문·EventStream이 다 찍힌다 |
+| 태우는 것 | 화면만 | 화면 + `client.ts` + `map.ts` + 오류 규격 |
+| 배포 | `VITE_API=mock`으로 Vercel 가능 | **개발 서버 전용** (앱 번들에 한 줄도 안 들어간다) |
+
+화면만 빨리 볼 때는 브라우저 목이 빠르고, **서버에 붙였을 때 생길 어긋남**(DTO 필드·오류 코드·SSE 순서)을
+미리 보려면 개발 서버 목 API를 쓴다. 문구·모양은 `docs/handoff/05_API_명세서.md` 예시를 그대로 옮겼다 —
+`dev/server/data.ts`에서 문구를 다듬으면 서버가 줄 글과 달라져 보는 뜻이 없어진다. MSW가 아니다(서비스 워커·의존성 없음).
 
 **`VITE_API`를 안 넣으면 아무 소리 없이 목으로 떨어진다** — 화면이 둘을 구분하지 못하니 겉으로는 멀쩡해 보인다.
 서버에 붙이려면 `VITE_API=http`와 `VITE_API_BASE`(끝에 `/api/v1`, 슬래시로 끝내지 않는다) 둘 다 필요하다.
