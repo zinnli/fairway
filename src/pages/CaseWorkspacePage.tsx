@@ -494,14 +494,24 @@ export function CaseWorkspacePage() {
             setActiveJob(activeJobNow);
             void reloadList();
           },
-          /* 채널이 끊겼고 되살리지 못했다 — 사건과 대화를 다시 읽어 맞춘다 */
+          /* 채널이 끊겼고 되살리지 못했다 — 사건과 대화를 다시 읽어 맞춘다.
+             Job이 돌고 있어도 끝났다는 이벤트는 이제 못 받으므로 activeJob을
+             내린다 — 안 내리면 로딩 카드와 입력 잠금이 사건을 떠날 때까지 안 풀린다 */
           lost: () => {
-            void refresh();
-            void service.listMessages(caseId).then((again) => {
-              if (activeCase.current === caseId && again.length) {
-                dispatch({ type: 'reset', messages: again });
-              }
-            });
+            dropReplyCard();
+            refresh()
+              .catch(() => {})
+              .finally(() => {
+                if (activeCase.current === caseId) setActiveJob(null);
+              });
+            service
+              .listMessages(caseId)
+              .then((again) => {
+                if (activeCase.current === caseId && again.length) {
+                  dispatch({ type: 'reset', messages: again });
+                }
+              })
+              .catch(() => {});
           },
         });
         /* 읽는 사이에 사건을 떠났으면 붙자마자 뗀다 */
