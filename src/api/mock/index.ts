@@ -2,6 +2,7 @@ import type { Case, VideoRef } from '@/domain/case';
 import { emptyStages } from '@/domain/case';
 import type { ChatMessage, MessageBody } from '@/domain/message';
 import type { Statement } from '@/domain/document';
+import type { Verdict } from '@/domain/verdict';
 import type { ActiveJob, CaseDetail, CaseEvents, CaseService, Session } from '../service';
 import {
   ANALYSIS_SUMMARY,
@@ -124,10 +125,19 @@ async function runJudge(caseId: string) {
   await wait(2400);
   if (!find(caseId)) return;
 
-  c.verdict = DEMO_VERDICT;
+  /* 갓 내린 판정은 상대 보험사 주장을 모른다 — 판정 뒤에 사용자가 말하면
+     서버가 카드를 갱신한다(05 수정요청 9/6). 목도 같은 순서를 밟는다 */
+  const fresh: Verdict = {
+    ...DEMO_VERDICT,
+    opponentClaim: null,
+    /* null이어도 안내 문장은 항상 온다 (05 수정요청 표) — 카드가 이 줄로 알려 달라고 청한다 */
+    opponentClaimNote:
+      '상대 보험사가 제시한 과실비율은 아직 없어요. 채팅으로 알려주시면 판정과 나란히 비교해 드릴게요.',
+  };
+  c.verdict = fresh;
   c.stages = { ...c.stages, verdict: '완료' };
   c.status = '판정 완료';
-  push(caseId, { role: 'ai', kind: 'verdict', verdict: DEMO_VERDICT });
+  push(caseId, { role: 'ai', kind: 'verdict', verdict: fresh });
   setJob(caseId, null);
 }
 
@@ -288,6 +298,38 @@ export const mockService: CaseService = {
       /* 영상이 먼저 와 있었다면 이 설명이 분석의 방아쇠가 된다 */
       if (c.video && c.stages.analysis === '대기') {
         await runAnalysis(caseId);
+        return;
+      }
+      /* 판정 뒤에 상대 보험사가 주장하는 비율("30:70이래요")을 말하면 판정 카드가
+         그 자리에서 갱신된다 — 서버는 같은 id의 카드를 message.updated로 다시 보낸다
+         (05 수정요청 9/6). 목도 같은 길을 태워 revise 경로가 시연에서 돈다 */
+      const claim = c.verdict ? text.match(/(\d{1,3})\s*(?::|대)\s*(\d{1,3})/) : null;
+      if (c.verdict && claim && Number(claim[1]) + Number(claim[2]) === 100) {
+        const mine = Number(claim[1]);
+        const diff = mine - c.verdict.ratio.mine;
+        const updated: Verdict = {
+          ...c.verdict,
+          opponentClaim: { mine, opponent: Number(claim[2]) },
+          opponentClaimNote:
+            diff > 0
+              ? `상대 보험사 주장보다 내 과실이 ${diff}%p 낮게 나왔어요`
+              : diff < 0
+                ? `상대 보험사 주장보다 내 과실이 ${-diff}%p 높게 나왔어요`
+                : '상대 보험사 주장과 같은 비율이에요',
+        };
+        c.verdict = updated;
+        const log = logs[caseId] ?? [];
+        const at = log.findLastIndex((msg) => msg.kind === 'verdict');
+        if (at !== -1) {
+          const card = { ...log[at], verdict: updated } as ChatMessage;
+          log[at] = card;
+          emit(caseId, (on) => on.messageUpdated?.(card));
+        }
+        push(caseId, {
+          role: 'ai',
+          kind: 'text',
+          text: '상대 보험사 주장을 판정 카드에 나란히 담았어요. 카드에서 견줘 보세요.',
+        });
         return;
       }
       /* **어느 갈래에도 걸리지 않으면 반드시 한 마디는 한다.**
